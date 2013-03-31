@@ -68,7 +68,7 @@ function love.mousepressed(x,y,button)
 	if gamelost then return end
 	x = math.ceil(x/20)
 	y = math.ceil(y/20)
-	if firstclick then 
+	if firstclick and button=='l' then 
 		firstclick = false
 		new(width,height,bombn,x,y)
 	end
@@ -91,7 +91,10 @@ function love.draw()
 				love.graphics.setColor(255,255,255,255)
 				if t[i][j].n~=0 then love.graphics.printf(t[i][j].n,(i-1)*20,((j-1)*20)+6,20,"center") end
 			else
-				if t[i][j].marked then love.graphics.setColor(255,100,100,255)
+				if t[i][j].marked then 
+						if gamelost and t[i][j].n~=-1 then
+							love.graphics.setColor(170,110,110,255)
+						else love.graphics.setColor(255,100,100,255) end
 				else love.graphics.setColor(200,200,200,255) end
 				love.graphics.rectangle("fill",((i-1)*20)+2,((j-1)*20)+2,16,16)
 			end
