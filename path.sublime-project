@@ -1,0 +1,16 @@
+{
+	"folders":
+	[
+		{
+			"path": "Pathfinding"
+		}
+	],
+	"build_systems":
+	[
+		{
+			"name": "LOVE2D",
+			"working_dir": "${project_path}",
+			"cmd": ["love", "Pathfinding"]
+		}
+	]
+}
