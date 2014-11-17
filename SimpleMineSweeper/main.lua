@@ -44,7 +44,8 @@ function new(w, h, n, sx, sy)
 	end
 	compute()
 	if love.graphics.getWidth() ~= width * 20 or love.graphics.getHeight() ~= height * 20 then 
-		love.window.setMode(width * 20, height * 20)
+		local setMode = love.graphics.setMode or love.window.setMode
+		setMode(width * 20, height * 20)
 	end
 end
 
