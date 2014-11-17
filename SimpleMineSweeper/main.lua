@@ -2,29 +2,44 @@ bigFont = love.graphics.newFont(40)
 bigSize = bigFont:getWidth("You lost. Press 'r'")
 normalFont = love.graphics.newFont(12)
 function love.load()
-	firstclick = true
-	gamelost = false
-	new(30,30,240)
+	firstClick = true
+	gameLost = false
+	new(30, 30, 240)
 end
 
-function new(w,h,n,sx,sy)
-	t = {}
+function bombBehavior(x, y)
+	if grid[x][y].marked then return end
+	grid[x][y].opened = true
+	gameLost = true
+end
+
+function noBombBehavior(x, y)
+	if grid[x][y].marked or grid[x][y].opened then return end
+	grid[x][y].opened = true
+	if grid[x][y].n == 0 then
+		openUp(x, y)
+	end
+end
+
+function new(w, h, n, sx, sy)
+	grid = {}
 	width = w
 	height = h
-	bombn = n
+	bombN = n
 	for i = 1, width do
-		t[i] = {}
+		grid[i] = {}
 	end
 	local x, y
-	for _ = 1, bombn do
+	for _ = 1, bombN do
 		repeat
 			x = math.random(width)
 			y = math.random(height)
-		until (not t[x][y]) and ((not sx) or (((x > sx + 1 or x < sx - 1) or (y > sy + 1 or y < sy - 1))))
-		t[x][y] = {
+		until (not grid[x][y]) and ((not sx) or (((x > sx + 1 or x < sx - 1) or (y > sy + 1 or y < sy - 1))))
+		grid[x][y] = {
 			n = -1,
 			opened = false,
-			marked = false
+			marked = false,
+			behavior = bombBehavior
 		} -- bomb = -1
 	end
 	compute()
@@ -36,12 +51,13 @@ end
 function compute()
 	for i = 1, width do
 		for j = 1, height do
-			if not t[i][j] then 
-				t[i][j] = {
+			if not grid[i][j] then 
+				grid[i][j] = {
 					n = getAround(i, j),
 					opened = false,
-					marked = false
-				} 
+					marked = false,
+					behavior = noBombBehavior
+				}
 			end
 		end
 	end
@@ -51,7 +67,7 @@ function getAround(x,y)
 	local count = 0
 	for a = -1, 1 do
 		for b = -1, 1 do
-			if t[x + a] and t[x + a][y + b] and t[x + a][y + b].n == -1 then
+			if grid[x + a] and grid[x + a][y + b] and grid[x + a][y + b].n == -1 then
 				count = count + 1
 			end
 		end
@@ -59,48 +75,42 @@ function getAround(x,y)
 	return count
 end
 
-function openup()
+function openUp(x0, y0)
 	local i = 0
-	local x,y
+	local x, y
+	local aux = {{x0, y0}}
 	repeat
 		i = i + 1
 		x, y = unpack(aux[i])
 		for a = -1, 1 do
 			for b = -1, 1 do
-				if t[x + a] ~= nil and t[x + a][y + b] ~= nil then 
-					if t[x + a][y + b].n == 0 and (not t[x + a][y + b].opened) then
-						aux[#aux + 1] = {x + a,y + b}
+				if grid[x + a] ~= nil and grid[x + a][y + b] ~= nil then 
+					if grid[x + a][y + b].n == 0 and (not grid[x + a][y + b].opened) then
+						aux[#aux + 1] = {x + a, y + b}
 					end
-					t[x + a][y + b].opened = true
+					grid[x + a][y + b].opened = true
 				end
 			end
 		end
 	until #aux == i
 end
 
-function love.mousepressed(x,y,button)
-	if gamelost then return end
+function love.mousepressed(x, y, button)
+	if gameLost then return end
 	x = math.ceil(x / 20)
 	y = math.ceil(y / 20)
-	if firstclick and button == 'l' then 
-		firstclick = false
-		new(width, height, bombn, x, y)
+	if firstClick and button == 'l' then 
+		firstClick = false
+		new(width, height, bombN, x, y)
 	end
-	if button == 'l' and not t[x][y].marked and not t[x][y].opened then
-		t[x][y].opened = true
-		if t[x][y].n == 0 then
-			aux = {{x, y}}
-			openup()
-			aux = nil
-		elseif t[x][y].n == -1 then
-			gamelost = true
-		end
-	elseif button=='r' and not t[x][y].opened then
-		t[x][y].marked = not t[x][y].marked
+	if button == 'l' then
+		grid[x][y].behavior(x, y)
+	elseif button == 'r' and not grid[x][y].opened then
+		grid[x][y].marked = not grid[x][y].marked
 	end
 end
 
-function love.keypressed(key,code)
+function love.keypressed(key)
 	if key == 'r' then
 		love.load()
 	end
@@ -110,14 +120,14 @@ function love.draw()
 	love.graphics.setBackgroundColor(100, 100, 100, 255)
 	for i = 1, width do
 		for j = 1, height do
-			if t[i][j].opened then
+			if grid[i][j].opened then
 				love.graphics.setColor(255, 255, 255, 255)
-				if t[i][j].n ~= 0 then
-					love.graphics.printf(t[i][j].n, (i - 1) * 20,((j - 1) * 20) + 6, 20, "center")
+				if grid[i][j].n ~= 0 then
+					love.graphics.printf(grid[i][j].n, (i - 1) * 20,((j - 1) * 20) + 6, 20, "center")
 				end
 			else
-				if t[i][j].marked then 
-						if gamelost and t[i][j].n ~= -1 then
+				if grid[i][j].marked then 
+						if gameLost and grid[i][j].n ~= -1 then
 							love.graphics.setColor(170, 110, 110, 255)
 						else
 							love.graphics.setColor(255, 100, 100, 255)
@@ -129,7 +139,7 @@ function love.draw()
 			end
 		end
 	end
-	if gamelost then
+	if gameLost then
 		love.graphics.setFont(bigFont)
 		love.graphics.setColor(50, 180, 50, 255)
 		love.graphics.rectangle("fill", 90, 90, bigSize + 20, bigFont:getHeight() + 20)
