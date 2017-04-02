@@ -10,7 +10,7 @@ local right = {1, 0, 0} -- right direction
 local d = 1
 local div = 500
 local l, r, b, t = -W/(2*div), W/(2*div), -H/(2*div), H/(2*div)
-local Ia = 1 -- ambient light
+local Ia = {.8, .8, .8} -- ambient light
 local eps = 1e-5
 
 
@@ -18,11 +18,11 @@ local grb_vec = spheres
 local grb_id = 1
 
 function love.load()
-	spheres[1] = {pos = {0, 0, 0}, r = 1, color = {0, 255, 0}, kd = 2, ka = .1, ks = 2, p = 9}
-	spheres[2] = {pos = {2, -1, 0}, r = 1, color = {200, 0, 0}, kd = 3, ka = .2, ks = 4, p = 20}
-	spheres[3] = {pos = {2.5, .3, -1}, r = .5, color = {40, 40, 40}, mirror = true, kd = 0, ka = 0, ks = 0, p = 0}
-	lights[1] = {pos = {-1.2, 2, 0}, I = 1, ka = 1, kd = 0, ks = 0, r = .1, color = {255, 255, 255}}
-	lights[2] = {pos = {-1.2, -1, -1}, I = 1, ka = 1, kd = 0, ks = 0, r = .1, color = {255, 255, 255}}
+	spheres[1] = {pos = {0, 0, 0}, r = 1, kd = {0, 1, 0}, ka = {0, .1, 0}, ks = {1, 1, 1}, p = 9}
+	spheres[2] = {pos = {2, -1, 0}, r = 1, kd = {1, .3, 0}, ka = {.16, 0, 0}, ks = {1, 1, 1}, p = 20}
+	spheres[3] = {pos = {-2.5, .3, -1}, r = .5, kd = {.5, .5, .5}, ka = {.1, .1, .1}, ks = {2, 2, 2}, p = 100, km = {.2, .2, .2}}
+	lights[1] = {pos = {-1.2, 2, 0}, I = {2, 2, 2}, r = .1}
+	lights[2] = {pos = {-1.2, -1, -1}, I = {1, 1, 1},  r = .1}
 end
 
 local x, y = 0, 0
@@ -41,6 +41,10 @@ end
 
 local function smult(a, k)
 	return {a[1] * k, a[2] * k, a[3] * k}
+end
+
+local function mult3(a, b)
+	return {a[1] * b[1], a[2] * b[2], a[3] * b[3]}
 end
 
 local function norm(v)
@@ -71,7 +75,7 @@ function sphereHit(s, ro, rd, t0, t1)
 	end
 end
 
-function hit(ro, rd, t0, t1, no_light)
+function hit(ro, rd, t0, t1, check_lights)
 	local t, obj = 1/0, nil
 	for _, s in ipairs(spheres) do
 		local x = sphereHit(s, ro, rd, t0, t1)
@@ -79,7 +83,7 @@ function hit(ro, rd, t0, t1, no_light)
 			t, obj = x, s
 		end
 	end
-	if not no_light then
+	if check_lights then
 		for _, l in ipairs(lights) do
 			local x = sphereHit(l, ro, rd, t0, t1)
 			if x and x < t then
@@ -92,31 +96,31 @@ end
 
 function rayColor(ro, rd, t0, t1, rec)
 	if rec and rec > 3 then return nil end
-	local obj, t = hit(ro, rd, t0, t1)
+	local obj, t = hit(ro, rd, t0, t1, true)
 	if obj ~= nil then
 		local pos = add(ro, smult(rd, t))
-		local L = obj.ka * Ia
 		local v = norm(sub(ro, pos))
 		local n = norm(sub(pos, obj.pos)) -- assumes it is a sphere
-		if obj.mirror then
-			local d = norm(sub(pos, ro))
-			local r = sub(d, smult(n, 2 * dot(d, n)))
-			local c = rayColor(pos, r, eps, 1/0, (rec or 0) + 1)
-			if c then return add(smult(c, .9), obj.color)
-			else return obj.color end
-		end
-		if obj.kd ~= 0 or obj.ks ~= 0 then
-			for _, lg in ipairs(lights) do
-				local l = norm(sub(lg.pos, pos))
-				if not hit(pos, l, eps, 1/0, true) then
-					local h = norm(add(l, v))
-					local r2 = dot(sub(lg.pos, pos), sub(lg.pos, pos))
-					L = L + obj.kd * (lg.I / r2) * math.max(0, dot(n, l)) -- diffuse
-					L = L + obj.ks * (lg.I / r2) * math.pow(math.max(0, dot(n, h)), obj.p) -- specular
+		if obj.I then return {1, 1, 1} end -- light source
+		local L = mult3(obj.ka, Ia)
+		for _, lg in ipairs(lights) do
+			local l = norm(sub(lg.pos, pos))
+			if not hit(pos, l, eps, 1/0, false) then
+				local h = norm(add(l, v))
+				local r2 = dot(sub(lg.pos, pos), sub(lg.pos, pos))
+				if dot(n, l) > 0 then
+					L = add(L, smult(mult3(obj.kd, lg.I), math.max(0, dot(n, l) / r2))) -- diffuse
+					L = add(L, smult(mult3(obj.ks, lg.I), math.pow(math.max(0, dot(n, h)), obj.p) / r2))  -- specular
 				end
 			end
 		end
-		return smult(obj.color, L)
+		if obj.km ~= nil then
+			local d = norm(sub(pos, ro))
+			local r = sub(d, smult(n, 2 * dot(d, n)))
+			local c = rayColor(pos, r, eps, 1/0, (rec or 0) + 1)
+			if c then L = add(L, mult3(c, obj.km)) end
+		end
+		return L
 	end
 	return nil
 end
@@ -132,9 +136,9 @@ function love.draw()
 			-- ray direction
 			local rd = add(add(smult(look, d), smult(right, u)), smult(up, v))
 
-			local clr = rayColor(e, rd, 0, 1/0)
+			local clr = rayColor(e, rd, 1, 1/0)
 			if clr then
-				color(clr)
+				color(clr[1] * 255, clr[2] * 255, clr[3] * 255)
 				point(i + .5, (H - 1 - j) + .5)
 			end
 		end
