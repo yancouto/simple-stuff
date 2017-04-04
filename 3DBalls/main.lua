@@ -108,10 +108,8 @@ function rayColor(ro, rd, t0, t1, rec)
 			if not hit(pos, l, eps, 1/0, false) then
 				local h = norm(add(l, v))
 				local r2 = dot(sub(lg.pos, pos), sub(lg.pos, pos))
-				if dot(n, l) > 0 then
-					L = add(L, smult(mult3(obj.kd, lg.I), math.max(0, dot(n, l) / r2))) -- diffuse
-					L = add(L, smult(mult3(obj.ks, lg.I), math.pow(math.max(0, dot(n, h)), obj.p) / r2))  -- specular
-				end
+				L = add(L, smult(mult3(obj.kd, lg.I), math.max(0, dot(n, l) / r2))) -- diffuse
+				L = add(L, smult(mult3(obj.ks, lg.I), math.pow(math.max(0, dot(n, h)), obj.p) / r2))  -- specular
 			end
 		end
 		if obj.km ~= nil then
