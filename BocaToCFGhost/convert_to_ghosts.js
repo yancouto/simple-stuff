@@ -1,7 +1,7 @@
 // MODIFY THESE FIELDS
 const RUN_FILE = "runlist.html"
 const CONTEST_NAME = "2017 USP Try-outs"
-const PROBLEMS = [ // A, B, ... (in order)
+const PROBLEMS = [ // Title of problems: A, B, ... (in order)
 ]
 //////////////////////
 
@@ -46,7 +46,7 @@ function get_verd(verd) {
 }
 
 function print_ghosts() {
-	console.log(""); // weird beginning char
+	console.log(""); // weird beginning char (^Z, in vim type it with ctr+v ctrl+z)
 	console.log('@contest "' + CONTEST_NAME + '"');
 	console.log("@contlen 300");
 	console.log("@problems " + PROBLEMS.length);
