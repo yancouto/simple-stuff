@@ -1,0 +1,16 @@
+{
+  "name": "ts-love",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tstl -p tsconfig.json",
+    "love": "npm run build && love build"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "typescript-to-lua": "^0.11.1"
+  }
+}
