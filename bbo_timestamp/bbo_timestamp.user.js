@@ -1,20 +1,26 @@
 // ==UserScript==
 // @name         BBO chat timestamp
-// @namespace    http://tampermonkey.net/
-// @version      0.1
+// @namespace    https://github.com/yancouto/simple-stuff/tree/master/bbo_timestamp
+// @version      0.2
 // @description  Add timestamps to chats in BBO
 // @author       Yan Couto
-// @match        https://www.bridgebase.com/v3/
-// @grant        none
+// @match        https://www.bridgebase.com/v3/*
 // @require http://code.jquery.com/jquery-latest.js
 // ==/UserScript==
+
+const zeroPad = (num) => String(num).padStart(2, '0')
+
+function genTimestamp() {
+    const now = new Date();
+    return `[${zeroPad(now.getHours())}:${zeroPad(now.getMinutes())}:${zeroPad(now.getSeconds())}]`;
+}
 
 (function () {
     'use strict';
 
-    console.log("Running BBO script 8");
+    console.log("Running BBO timestamp script");
     $(document).on('DOMNodeInserted', () => {
-        const now = new Date();
-        $('chat-list-item').filter(function () { return $('.bbotimestamp', this).length == 0; }).prepend(`<p class="bbotimestamp">${now}</p>`);
+        const now = genTimestamp();
+        $('chat-list-item').filter(function () { return $('.bbotimestamp', this).length == 0; }).prepend(`<div class="bbotimestamp">${now}</div>`);
     });
 })();
