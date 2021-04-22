@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BBO chat timestamp
 // @namespace    https://github.com/yancouto/simple-stuff/tree/master/bbo_timestamp
-// @version      0.2
+// @version      1.0
 // @description  Add timestamps to chats in BBO
 // @author       Yan Couto
 // @match        https://www.bridgebase.com/v3/*
@@ -21,6 +21,6 @@ function genTimestamp() {
     console.log("Running BBO timestamp script");
     $(document).on('DOMNodeInserted', () => {
         const now = genTimestamp();
-        $('chat-list-item').filter(function () { return $('.bbotimestamp', this).length == 0; }).prepend(`<div class="bbotimestamp">${now}</div>`);
+        $('chat-list-item').filter(function () { return $('.bbotimestamp', this).length == 0; }).prepend(`<span class="bbotimestamp">${now} </span>`);
     });
 })();
