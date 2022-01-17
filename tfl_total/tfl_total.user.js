@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Add up expenses in TFL
 // @namespace    https://github.com/yancouto/simple-stuff/tree/master/tfl_total
-// @version      0.1
+// @version      0.2
 // @author       Yan Couto
 // @match        https://contactless.tfl.gov.uk/NewStatements/Billing*
 // @require http://code.jquery.com/jquery-latest.js
@@ -14,7 +14,7 @@
     $(document).on('DOMNodeInserted', () => {
         let statement = $('.col-md-12 > ').filter(function() { return $(this).text() === "Statement"; });
         let values = statement.parent().find('.travelstatement-billingdetail-priceheading').map((a, b) => b.innerText);
-        let total = [...values].reduce((a, b) => {
+        let total = values.toArray().reduce((a, b) => {
             let m = b.match(/£(\d+(.\d+)?)/);
             if (m) {
                 return a + parseFloat(m[1]);
