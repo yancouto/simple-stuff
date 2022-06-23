@@ -4,7 +4,7 @@
   "description": "Converts BOCA runlist to CF Gym Ghosts.",
   "main": "convert_to_ghosts.js",
   "dependencies": {
-    "jsdom": "11.12.0"
+    "jsdom": "16.5.0"
   },
   "devDependencies": {},
   "scripts": {
