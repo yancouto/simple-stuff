@@ -1,0 +1,13 @@
+[package]
+name = "answer_graph"
+version = "0.1.0"
+edition = "2021"
+default-run = "answer_graph"
+
+
+[dependencies]
+regex = "1"
+clap = {version = "3", features = ["derive"]}
+
+[[bin]]
+name = "love_death_robots_per_season"
