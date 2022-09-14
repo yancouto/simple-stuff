@@ -1,0 +1,27 @@
+{
+  "name": "dreamjournalmove2",
+  "version": "1.0.0",
+  "description": "I used these scripts to move my dream journal from the \"Lucidity\" app to Notion.",
+  "main": "csv_to_notion.ts",
+  "type": "module",
+  "scripts": {
+    "start": "tsc && node csv_to_notion.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yancouto/simple-stuff.git"
+  },
+  "author": "Yan Couto",
+  "license": "WTFPL",
+  "bugs": {
+    "url": "https://github.com/yancouto/simple-stuff/issues"
+  },
+  "homepage": "https://github.com/yancouto/simple-stuff#readme",
+  "dependencies": {
+    "@notionhq/client": "^2.2.0",
+    "csv-parse": "^5.3.0"
+  },
+  "devDependencies": {
+    "typescript": "^4.8.3"
+  }
+}
