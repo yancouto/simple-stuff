@@ -34,7 +34,7 @@ const process = (x) => {
 const run = () => {
     const processed = getProcessed()
     const s = new Set(processed)
-    getRows().slice(1).forEach((x) => {
+    getRows().forEach((x) => {
         const id = x.getAttribute('data-submission-id')
         const el = document.createElement('td')
         const button = document.createElement('button')
