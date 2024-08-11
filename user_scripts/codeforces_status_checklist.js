@@ -11,7 +11,7 @@
 
 (function() {
 
-const getProcessed = () => JSON.parse(localStorage.getItem('processed') ?? '[]')
+const getProcessed = () => JSON.parse(sessionStorage.getItem('processed') ?? '[]')
 const getRows = () => [...document.querySelector('.status-frame-datatable > tbody:nth-child(1)').children].slice(1)
 
 const filter = () => {
@@ -27,7 +27,7 @@ const filter = () => {
 const process = (x) => {
     const processed = getProcessed()
     processed.push(x.toString())
-    localStorage.setItem('processed', JSON.stringify(processed))
+    sessionStorage.setItem('processed', JSON.stringify(processed))
     filter()
 }
 
