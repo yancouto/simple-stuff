@@ -1,0 +1,32 @@
+# Adapted from https://www.unicode.org/Public/UCD/latest/ucd/Blocks.txt
+
+0000..007F; Basic Latin
+#0080..00FF; Latin-1 Supplement
+#0100..017F; Latin Extended-A
+#0180..024F; Latin Extended-B
+#0250..02AF; IPA Extensions
+0370..03FF; Greek and Coptic
+1F00..1FFF; Greek Extended
+#2000..206F; General Punctuation
+2070..209F; Superscripts and Subscripts
+20A0..20CF; Currency Symbols
+2100..214F; Letterlike Symbols
+2150..218F; Number Forms
+2190..21FF; Arrows
+2200..22FF; Mathematical Operators
+2300..23FF; Miscellaneous Technical
+2500..257F; Box Drawing
+2580..259F; Block Elements
+25A0..25FF; Geometric Shapes
+2600..26FF; Miscellaneous Symbols
+27C0..27EF; Miscellaneous Mathematical Symbols-A
+#27F0..27FF; Supplemental Arrows-A
+#2900..297F; Supplemental Arrows-B
+#2980..29FF; Miscellaneous Mathematical Symbols-B
+2A00..2AFF; Supplemental Mathematical Operators
+#2B00..2BFF; Miscellaneous Symbols and Arrows
+#2C80..2CFF; Coptic
+#1F780..1F7FF; Geometric Shapes Extended
+#1F800..1F8FF; Supplemental Arrows-C
+
+# EOF
