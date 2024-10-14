@@ -3,10 +3,13 @@
 #include <cassert>
 #include <fstream>
 #include <iostream>
+#include <ranges>
 #include <set>
 #include <sstream>
 
 #include "graph6.hpp"
+
+using namespace std::ranges;
 
 #define debug(...) (void)0
 // #define debug(...) printf(__VA_ARGS__)
@@ -29,40 +32,67 @@ bool quick_disconsider(const graph& g) {
   return false;
 }
 
-struct graph6_reader_iterator {
+struct graph6_reader_iterator
+    : public std::iterator<std::input_iterator_tag, graph> {
+  using iterator_category = std::input_iterator_tag;
+  using value_type = graph;
+  using pointer = graph*;
+  using reference = graph&;
+  using difference_type = std::ptrdiff_t;
+
+  graph g;
   std::istream_iterator<unsigned char> itt;
   graph6_reader_iterator() {}
   graph6_reader_iterator(std::istream_iterator<unsigned char> itt_)
-      : itt(itt_) {}
-
-  graph6_reader_iterator& operator++() {
-    // assume deref once then incr once
-    return *this;
+      : itt(itt_) {
+    read();
   }
 
-  graph operator*() {
+  graph6_reader_iterator& operator++() {
+    read();
+    return *this;
+  }
+  void operator++(int) { read(); }
+  void read() {
+    g = graph();
+    if (itt == std::istream_iterator<unsigned char>()) return;
     read_graph6_edges it(itt);
-    graph g;
     for (; !it.eos; ++it) {
       auto [u, v] = *it;
       assert(u >= v);
       g.add_edge(u, v, true);
     }
-    return g;
+    g.validate();
   }
 
+  graph operator*() { return graph(g); }
+
   bool operator!=(const graph6_reader_iterator& other) const {
-    return itt != other.itt;
+    return g != other.g || itt != other.itt;
+  }
+  bool operator==(const graph6_reader_iterator& other) const {
+    return g == other.g && itt == other.itt;
   }
 };
 
-struct graph6_reader_iterable {
+struct graph6_reader_iterable
+    : public std::ranges::view_interface<graph6_reader_iterable> {
   std::istream& infile;
   graph6_reader_iterable(std::istream& infile_) : infile(infile_) {}
   graph6_reader_iterator begin() {
     return graph6_reader_iterator(std::istream_iterator<unsigned char>(infile));
   }
   graph6_reader_iterator end() { return graph6_reader_iterator(); }
+  auto to_view() {
+    auto it = begin();
+    auto last = end();
+    return views::repeat(0) | views::transform([=](int) mutable {
+             if (it == last) return graph();
+             graph g = *it;
+             ++it;
+             return g;
+           });
+  }
 };
 
 vector<graph> graph::from_file(const string& filename, Format format) {
@@ -156,7 +186,7 @@ void graph::validate() const {
     for (int j = 0; j < adj[u].size(); j++) {
       assert(j == 0 || adj[u][j - 1] != adj[u][j]);
       assert(0 <= adj[u][j] && adj[u][j] < adj.size());
-      assert(exists_edge(adj[u][j], u));
+      assert(has_edge(adj[u][j], u));
     }
   }
 }
@@ -173,14 +203,11 @@ graph graph::induced_subgraph(const vector<int>& vxs) const {
   assert(std::is_sorted(vxs.begin(), vxs.end()));
   graph g2;
   g2.adj.resize(vxs.size());
-  debug("Making induced\n");
   for (int ui = 0; ui < vxs.size(); ui++) {
     int u = vxs[ui];
-    debug("u %d (ui %d)\n", u, ui);
     for (int v : adj[u]) {
       int vi = find_idx(vxs, v);
       if (vi != -1) {
-        debug("Add %d->%d\n", ui + 1, vi + 1);
         g2.add_edge(ui, vi, false);
       }
     }
@@ -210,7 +237,8 @@ bool graph::is_connected() const {
 void graph::print_debug(bool edges) const {
   if (edges) {
     for (int u = 0; u < adj.size(); u++)
-      for (int v : adj[u]) printf("%d %d\n", u + 1, v + 1);
+      for (int v : adj[u])
+        if (v > u) printf("%d %d\n", u + 1, v + 1);
     return;
   }
 
@@ -270,17 +298,23 @@ vector<int> try_build_forest_cut_rec(const graph& g, vector<int>& cut_so_far,
 
 vector<int> graph::forest_cut() const {
   for (int u = 0; u < adj.size(); u++)
-    if (adj[u].size() < vertex_count() - 1 && has_acyclic_neighborhood(u))
+    if (adj[u].size() < vertex_count() - 1 && has_acyclic_neighborhood(u)) {
+      debug("Using neighborhood of %d\n", u + 1);
       return vector(adj[u]);
+    }
   for (int u = 0; u < adj.size(); u++)
     if (adj[u].size() == vertex_count() - 1) {
       // Possible to build using the < 2n - 3 independent set bound, but let's
       // not do it now bc it might be hard.
+      debug("Using independent set theorem.\n");
       return {-1};
     }
-  if (max_degree() < 5 || min_degree() < 4 || !is_3_connected()) return {-2};
+  if (max_degree() < 5 || min_degree() < 4 || !is_4_connected()) {
+    debug("Not 4 connected or small degrees.\n");
+    return {-2};
+  }
   vector<int> cut_so_far;
-  printf("will brute force\n");
+  debug("will brute force\n");
   vector<int> ans = try_build_forest_cut_rec(*this, cut_so_far, 0, -1);
   debug("Had to brute force for a forest cut.\n");
   if (!ans.empty()) assert(is_forest_cut(ans));
@@ -330,6 +364,15 @@ bool graph::is_4_connected() const {
   return true;
 }
 
+vector<int> graph::neighborhood(const vector<int>& vxs) const {
+  vector<int> all, ans;
+  for (int u : vxs) all.insert(all.end(), adj[u].begin(), adj[u].end());
+  std::sort(all.begin(), all.end());
+  std::set_difference(all.begin(), all.end(), vxs.begin(), vxs.end(),
+                      std::back_inserter(ans));
+  return ans;
+}
+
 // A forest cut removing each vertex
 bool graph::has_strong_forest_cut() const {
   vector<int> cut_so_far;
@@ -359,8 +402,8 @@ bool graph::has_universal_edge() const {
     for (int v : adj[u]) {
       if (v < u || adj[u].size() + adj[v].size() < n) continue;
       vector<int> all_adj(adj[u]);
-      for (int w : adj[v]) all_adj.push_back(w);
-      sort(all_adj.begin(), all_adj.end());
+      all_adj.insert(all_adj.end(), adj[v].begin(), adj[v].end());
+      std::sort(all_adj.begin(), all_adj.end());
       if (std::unique(all_adj.begin(), all_adj.end()) - all_adj.begin() == n)
         return true;
     }

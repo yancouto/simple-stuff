@@ -1,30 +1,13 @@
-// Fuck it, include cpp
 #include <cstdio>
 #include <ctime>
 
+// Fuck it, include cpp
 #include "graph.cpp"
 
 // input file
 const string input_filename = "input.g6";
 const bool FIND_TRIVIAL = false;
 const bool FIND_INDUCTION = false;
-
-struct time_count {
-  int prev;
-  time_count() : prev(time(NULL)) {}
-  int reset() {
-    int p = prev;
-    prev = time(NULL);
-    return prev - p;
-  }
-  int peek() const { return time(NULL) - prev; }
-};
-
-graph test_graph_1() {
-  graph g;
-  // TODO
-  return g;
-}
 
 int main() {
   printf("Starting.\n");

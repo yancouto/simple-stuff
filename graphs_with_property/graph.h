@@ -1,10 +1,22 @@
 #include <algorithm>
+#include <cassert>
 #include <numeric>
 #include <string>
 #include <vector>
 
 using std::string;
 using std::vector;
+
+struct time_count {
+  int prev;
+  time_count() : prev(time(NULL)) {}
+  int reset() {
+    int p = prev;
+    prev = time(NULL);
+    return prev - p;
+  }
+  int peek() const { return time(NULL) - prev; }
+};
 
 enum Format {
   // lines with "u: v1 v2 v3 ..." where u is the vertex and v1, v2, v3, ... are
@@ -25,6 +37,7 @@ struct graph {
   static vector<graph> from_file(const string& filename, Format format);
   void validate() const;
   // properties
+  int degree(int u) const { return adj[u].size(); }
   int min_degree() const {
     return min_element(adj.begin(), adj.end(),
                        [](auto& a, auto& b) { return a.size() < b.size(); })
@@ -36,9 +49,10 @@ struct graph {
         ->size();
   }
   int edge_count() const {
-    return std::accumulate(adj.begin(), adj.end(), 0,
-                           [](int a, auto& b) { return a + b.size(); }) /
-           2;
+    assert(2 * m ==
+           std::accumulate(adj.begin(), adj.end(), 0,
+                           [](int a, auto& b) { return a + b.size(); }));
+    return m;
   }
   int vertex_count() const { return adj.size(); }
   bool is_connected() const;
@@ -63,19 +77,38 @@ struct graph {
       if (!std::binary_search(vxs.begin(), vxs.end(), u)) ans.push_back(u);
     return ans;
   }
+  vector<int> neighborhood(const vector<int>& vxs) const;
 
   // Simple graph operations
   // O(lg n)
-  bool exists_edge(int u, int v) const {
+  bool has_edge(int u, int v) const {
     return std::binary_search(adj[u].begin(), adj[u].end(), v);
   }
-  void add_edge(int u, int v, bool rev = true) {
+  void add_edge(int u, int v, bool rev = true, bool sort = false) {
     while (adj.size() <= u || adj.size() <= v) adj.emplace_back();
     adj[u].push_back(v);
+    if (u <= v || rev) m++;
+    if (sort) std::sort(adj[u].begin(), adj[u].end());
     if (rev) adj[v].push_back(u);
+    if (rev && sort) std::sort(adj[v].begin(), adj[v].end());
   }
+  void erase_edge(int u, int v) {
+    assert(has_edge(u, v));
+    auto it = std::lower_bound(adj[u].begin(), adj[u].end(), v);
+    assert(it != adj[u].end() && *it == v);
+    adj[u].erase(it);
+    it = std::lower_bound(adj[v].begin(), adj[v].end(), u);
+    assert(it != adj[v].end() && *it == u);
+    adj[v].erase(it);
+    m--;
+  }
+
+  bool operator==(const graph& other) const { return adj == other.adj; }
+  bool operator!=(const graph& other) const { return !(*this == other); }
 
   void print_debug(bool edges = false) const;
   // vertices in 0..n-1
   vector<vector<int>> adj;
+  // Stored for convenience
+  int m = 0;
 };
