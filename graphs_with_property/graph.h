@@ -82,6 +82,7 @@ struct graph {
   // Simple graph operations
   // O(lg n)
   bool has_edge(int u, int v) const {
+    if (u >= adj.size() || v >= adj.size()) return false;
     return std::binary_search(adj[u].begin(), adj[u].end(), v);
   }
   void add_edge(int u, int v, bool rev = true, bool sort = false) {

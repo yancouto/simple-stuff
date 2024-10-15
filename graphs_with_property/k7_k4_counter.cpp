@@ -2,11 +2,13 @@
 #include <ctime>
 #include <ranges>
 
+using namespace std::ranges;
 // Fuck it, include cpp
 #include "graph.cpp"
 
-using namespace std::ranges;
 typedef std::pair<int, int> edge;
+
+const bool READ_SINGLE_INPUT = false;
 
 graph create_counter() {
   graph g;
@@ -29,18 +31,27 @@ graph create_counter() {
   return g;
 }
 
+vector<graph> get_graphs() {
+  if (READ_SINGLE_INPUT)
+    return graph::from_file("input.txt", Format::EDGES);
+  else
+    return {create_counter()};
+}
+
 int main() {
   printf("Starting.\n");
   srand(time(NULL));
-  graph g = create_counter();
-  auto cut = g.forest_cut();
-  if (cut.empty())
-    printf("No forest cut\n");
-  else {
-    assert(g.is_forest_cut(cut));
-    printf("Cut:");
-    for (int v : cut) printf(" %d", v + 1);
-    putchar('\n');
-    g.print_debug();
+  auto graphs = get_graphs();
+  for (graph g : graphs) {
+    auto cut = g.forest_cut();
+    if (cut.empty())
+      printf("No forest cut\n");
+    else {
+      assert(g.is_forest_cut(cut));
+      printf("Cut:");
+      for (int v : cut) printf(" %d", v + 1);
+      putchar('\n');
+      g.print_debug();
+    }
   }
 }

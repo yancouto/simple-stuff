@@ -3,6 +3,7 @@
 #include <cassert>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <ranges>
 #include <set>
 #include <sstream>
@@ -83,7 +84,7 @@ struct graph6_reader_iterable
     return graph6_reader_iterator(std::istream_iterator<unsigned char>(infile));
   }
   graph6_reader_iterator end() { return graph6_reader_iterator(); }
-  auto to_view() {
+  /*auto to_view() {
     auto it = begin();
     auto last = end();
     return views::repeat(0) | views::transform([=](int) mutable {
@@ -92,14 +93,29 @@ struct graph6_reader_iterable
              ++it;
              return g;
            });
-  }
+  }*/
 };
 
 vector<graph> graph::from_file(const string& filename, Format format) {
   vector<graph> gs;
   std::ifstream infile;
   infile.open(filename);
-  if (format == ADJ_LIST) {
+  if (format == Format::EDGES) {
+    graph g;
+    std::map<int, int> vertex_map;
+    int vertex_counter = 0;
+    int u, v;
+    while (infile >> u >> v) {
+      if (vertex_map.find(u) == vertex_map.end())
+        vertex_map[u] = vertex_counter++;
+      if (vertex_map.find(v) == vertex_map.end())
+        vertex_map[v] = vertex_counter++;
+      if (!g.has_edge(vertex_map[u], vertex_map[v]))
+        g.add_edge(vertex_map[u], vertex_map[v], true, false);
+    }
+    for (int i = 0; i < vertex_counter; i++) std::ranges::sort(g.adj[i]);
+    gs.push_back(g);
+  } else if (format == ADJ_LIST) {
     string line;
     int u, v;
     char sep;
