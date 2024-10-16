@@ -317,6 +317,8 @@ struct forest_cut_builder {
       if (!g.induced_subgraph(g.vertices_complement(cut_so_far)).is_connected())
         return true;
       bool can_be_minimal = std::ranges::all_of(cut_so_far, [&](int u) {
+        // trivially true
+        if (g.degree(u) >= cut_so_far.size() - 1 + 2) return true;
         vector<int> adj_outside_cut;
         std::ranges::set_difference(g.adj[u], cut_so_far,
                                     std::back_inserter(adj_outside_cut));
