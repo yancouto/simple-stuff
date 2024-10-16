@@ -296,6 +296,7 @@ bool graph::has_acyclic_neighborhood(int u) const {
 
 struct forest_cut_builder {
  public:
+  // Finds a forest cut in the graph.
   static vector<int> brute(const graph& g, int vertex_to_exclude = -1) {
     forest_cut_builder fc = {g, vector<int>(), vertex_to_exclude};
     return fc(0) ? fc.cut_so_far : vector<int>();
@@ -305,16 +306,23 @@ struct forest_cut_builder {
   vector<int> cut_so_far;
   int vertex_to_exclude;
   // Invariant: cut_so_far is acyclic but it's not a cut, and we can't add vxs <
-  // next_u_to_add to it.
+  // next_u_to_add to it. All vxs in the cut have >= 2 edges to outside the cut
+  // (otherwise it wouldn't be minimal).
   bool operator()(int next_u_to_add) {
     if (next_u_to_add == g.vertex_count()) return false;
     if (next_u_to_add == vertex_to_exclude) return (*this)(next_u_to_add + 1);
     cut_so_far.push_back(next_u_to_add);
     if (g.induced_subgraph(cut_so_far).is_acyclic()) {
-      // We found a forest-cut!
+      // We found a forest-cut! Idc if it's actually minimal.
       if (!g.induced_subgraph(g.vertices_complement(cut_so_far)).is_connected())
         return true;
-      if ((*this)(next_u_to_add + 1)) return true;
+      bool can_be_minimal = std::ranges::all_of(cut_so_far, [&](int u) {
+        vector<int> adj_outside_cut;
+        std::ranges::set_difference(g.adj[u], cut_so_far,
+                                    std::back_inserter(adj_outside_cut));
+        return adj_outside_cut.size() >= 2;
+      });
+      if (can_be_minimal && (*this)(next_u_to_add + 1)) return true;
     }
     cut_so_far.pop_back();
     return (*this)(next_u_to_add + 1);
