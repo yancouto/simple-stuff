@@ -14,6 +14,9 @@ using namespace std::ranges;
 
 #define debug(...) (void)0
 // #define debug(...) printf(__VA_ARGS__)
+//  Remove assert if we trust the code
+#undef assert
+#define assert(...) (void)0
 
 // A macro that prints the text of the expression and the bool value of it.
 // #define DEB(expr)                                     \
@@ -84,7 +87,7 @@ struct graph6_reader_iterable
     return graph6_reader_iterator(std::istream_iterator<unsigned char>(infile));
   }
   graph6_reader_iterator end() { return graph6_reader_iterator(); }
-  /*auto to_view() {
+  auto to_view() {
     auto it = begin();
     auto last = end();
     return views::repeat(0) | views::transform([=](int) mutable {
@@ -93,7 +96,7 @@ struct graph6_reader_iterable
              ++it;
              return g;
            });
-  }*/
+  }
 };
 
 vector<graph> graph::from_file(const string& filename, Format format) {
@@ -291,26 +294,32 @@ bool graph::has_acyclic_neighborhood(int u) const {
   return induced_subgraph(adj[u]).is_acyclic();
 }
 
-// Invariant: cut_so_far is acyclic but it's not a cut.
-vector<int> try_build_forest_cut_rec(const graph& g, vector<int>& cut_so_far,
-                                     int next_u_to_add, int vertex_to_exclude) {
-  if (next_u_to_add == g.vertex_count()) return {};
-  if (next_u_to_add == vertex_to_exclude)
-    return try_build_forest_cut_rec(g, cut_so_far, next_u_to_add + 1,
-                                    vertex_to_exclude);
-  cut_so_far.push_back(next_u_to_add);
-  if (g.induced_subgraph(cut_so_far).is_acyclic()) {
-    // We found a forest-cut!
-    if (!g.induced_subgraph(g.vertices_complement(cut_so_far)).is_connected())
-      return cut_so_far;
-    vector<int> ans_with_u = try_build_forest_cut_rec(
-        g, cut_so_far, next_u_to_add + 1, vertex_to_exclude);
-    if (!ans_with_u.empty()) return vector(ans_with_u);
+struct forest_cut_builder {
+ public:
+  static vector<int> brute(const graph& g, int vertex_to_exclude = -1) {
+    forest_cut_builder fc = {g, vector<int>(), vertex_to_exclude};
+    return fc(0) ? fc.cut_so_far : vector<int>();
   }
-  cut_so_far.pop_back();
-  return try_build_forest_cut_rec(g, cut_so_far, next_u_to_add + 1,
-                                  vertex_to_exclude);
-}
+
+  const graph& g;
+  vector<int> cut_so_far;
+  int vertex_to_exclude;
+  // Invariant: cut_so_far is acyclic but it's not a cut, and we can't add vxs <
+  // next_u_to_add to it.
+  bool operator()(int next_u_to_add) {
+    if (next_u_to_add == g.vertex_count()) return false;
+    if (next_u_to_add == vertex_to_exclude) return (*this)(next_u_to_add + 1);
+    cut_so_far.push_back(next_u_to_add);
+    if (g.induced_subgraph(cut_so_far).is_acyclic()) {
+      // We found a forest-cut!
+      if (!g.induced_subgraph(g.vertices_complement(cut_so_far)).is_connected())
+        return true;
+      if ((*this)(next_u_to_add + 1)) return true;
+    }
+    cut_so_far.pop_back();
+    return (*this)(next_u_to_add + 1);
+  }
+};
 
 vector<int> graph::forest_cut() const {
   for (int u = 0; u < adj.size(); u++)
@@ -329,10 +338,10 @@ vector<int> graph::forest_cut() const {
     debug("Not 4 connected or small degrees.\n");
     return {-2};
   }
-  vector<int> cut_so_far;
-  debug("will brute force\n");
-  vector<int> ans = try_build_forest_cut_rec(*this, cut_so_far, 0, -1);
-  debug("Had to brute force for a forest cut.\n");
+  time_count tc;
+  vector<int> ans = forest_cut_builder::brute(*this);
+  if (tc.peek() > 0.05)
+    debug("(%.2fs) Had to brute force for a forest cut.\n", tc.peek());
   if (!ans.empty()) assert(is_forest_cut(ans));
   return ans;
 }
@@ -347,9 +356,10 @@ vector<int> graph::non_trivial_forest_cut() const {
       // not do it now bc it might be hard.
       return {};
     }
-  vector<int> cut_so_far;
-  vector<int> ans = try_build_forest_cut_rec(*this, cut_so_far, 0, -1);
-  debug("Had to brute force for a forest cut.\n");
+  time_count tc;
+  vector<int> ans = forest_cut_builder::brute(*this);
+  if (tc.peek() > 0.05)
+    debug("(%.2fs) Had to brute force for a forest cut.\n", tc.peek());
   if (!ans.empty()) assert(is_forest_cut(ans));
   return ans;
 }
@@ -393,14 +403,14 @@ vector<int> graph::neighborhood(const vector<int>& vxs) const {
 bool graph::has_strong_forest_cut() const {
   vector<int> cut_so_far;
   std::set<int> forest_cut_without_u;
-  vector<int> cut = try_build_forest_cut_rec(*this, cut_so_far, 0, -1);
+  vector<int> cut = forest_cut_builder::brute(*this);
   if (cut.empty()) return false;
   for (int u : vertices_complement(cut)) forest_cut_without_u.insert(u);
   int n = vertex_count();
   for (int u = 0; u < n; u++) {
     if (forest_cut_without_u.count(u) == 0) {
       cut_so_far.clear();
-      cut = try_build_forest_cut_rec(*this, cut_so_far, 0, u);
+      cut = forest_cut_builder::brute(*this, u);
       if (cut.empty()) {
         printf("No cut for vertex %d\n", u + 1);
         return false;

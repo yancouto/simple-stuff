@@ -1,0 +1,1 @@
+g++ -std=c++23 -Wno-deprecated-declarations -O2 -o generate_counter_from_4_regular.exe generate_counter_from_4_regular.cpp

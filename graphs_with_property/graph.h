@@ -1,21 +1,32 @@
 #include <algorithm>
 #include <cassert>
+#include <chrono>
+#include <iostream>
 #include <numeric>
+#include <ranges>
 #include <string>
 #include <vector>
 
 using std::string;
 using std::vector;
+using std::chrono::steady_clock;
 
 struct time_count {
-  int prev;
-  time_count() : prev(time(NULL)) {}
-  int reset() {
-    int p = prev;
-    prev = time(NULL);
-    return prev - p;
+  typedef decltype(steady_clock::now()) time;
+  time prev;
+  time_count() : prev(steady_clock::now()) {}
+  double reset() {
+    time prev_prev = prev;
+    prev = steady_clock::now();
+    return sub(prev, prev_prev);
   }
-  int peek() const { return time(NULL) - prev; }
+  double peek() const { return sub(steady_clock::now(), prev); }
+
+ private:
+  double sub(const time& a, const time& b) const {
+    assert(a >= b);
+    return std::chrono::duration<double>(a - b).count();
+  }
 };
 
 enum Format {
@@ -31,6 +42,8 @@ enum Format {
 
 struct graph {
  public:
+  graph() {}
+  graph(const graph& other) : adj(other.adj), m(other.m) {}
   // IO
   static void to_file(const vector<graph>& gs, const string& filename,
                       Format format);
@@ -55,6 +68,10 @@ struct graph {
     return m;
   }
   int vertex_count() const { return adj.size(); }
+  auto vertices(int start = 0) const {
+    return std::ranges::views::iota(std::min<int>(start, adj.size()),
+                                    (int)adj.size());
+  }
   bool is_connected() const;
   bool is_acyclic() const;
   // Does the neighborhood of u induce an acyclic graph?
