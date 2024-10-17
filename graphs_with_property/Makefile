@@ -2,7 +2,7 @@
 CXX = g++
 
 # Compiler flags
-CXXFLAGS = -std=c++23 -Wno-deprecated-declarations
+CXXFLAGS = -std=c++17 -Wno-deprecated-declarations
 
 DEBUG ?= 0
 ifeq ($(DEBUG), 1)

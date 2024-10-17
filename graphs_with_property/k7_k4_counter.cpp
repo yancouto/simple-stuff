@@ -1,8 +1,6 @@
 #include <cstdio>
 #include <ctime>
-#include <ranges>
 
-using namespace std::ranges;
 // Fuck it, include cpp
 #include "graph.cpp"
 
@@ -26,7 +24,7 @@ graph create_counter() {
       g.add_edge(i * 4 + di2, j * 4 + dj2);
     }
   }
-  for (int i = 0; i < 28; i++) std::ranges::sort(g.adj[i]);
+  for (int i = 0; i < 28; i++) std::sort(g.adj[i].begin(), g.adj[i].end());
   g.validate();
   return g;
 }

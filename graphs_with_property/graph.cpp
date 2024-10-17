@@ -4,13 +4,10 @@
 #include <fstream>
 #include <iostream>
 #include <map>
-#include <ranges>
 #include <set>
 #include <sstream>
 
 #include "graph6.hpp"
-
-using namespace std::ranges;
 
 #define debug(...) (void)0
 // #define debug(...) printf(__VA_ARGS__)
@@ -79,8 +76,7 @@ struct graph6_reader_iterator
   }
 };
 
-struct graph6_reader_iterable
-    : public std::ranges::view_interface<graph6_reader_iterable> {
+struct graph6_reader_iterable {
   std::istream& infile;
   graph6_reader_iterable(std::istream& infile_) : infile(infile_) {}
   graph6_reader_iterator begin() {
@@ -116,7 +112,8 @@ vector<graph> graph::from_file(const string& filename, Format format) {
       if (!g.has_edge(vertex_map[u], vertex_map[v]))
         g.add_edge(vertex_map[u], vertex_map[v], true, false);
     }
-    for (int i = 0; i < vertex_counter; i++) std::ranges::sort(g.adj[i]);
+    for (int i = 0; i < vertex_counter; i++)
+      std::sort(g.adj[i].begin(), g.adj[i].end());
     gs.push_back(g);
   } else if (format == ADJ_LIST) {
     string line;
