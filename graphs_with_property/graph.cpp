@@ -95,10 +95,8 @@ struct graph6_reader_iterable {
   }*/
 };
 
-vector<graph> graph::from_file(const string& filename, Format format) {
+vector<graph> graph::from_file(std::istream& infile, Format format) {
   vector<graph> gs;
-  std::ifstream infile;
-  infile.open(filename);
   if (format == Format::EDGES) {
     graph g;
     std::map<int, int> vertex_map;
@@ -112,6 +110,8 @@ vector<graph> graph::from_file(const string& filename, Format format) {
       if (!g.has_edge(vertex_map[u], vertex_map[v]))
         g.add_edge(vertex_map[u], vertex_map[v], true, false);
     }
+    g.mapping.resize(g.adj.size());
+    for (auto [u, v] : vertex_map) g.mapping[v] = u;
     for (int i = 0; i < vertex_counter; i++)
       std::sort(g.adj[i].begin(), g.adj[i].end());
     gs.push_back(g);
@@ -254,13 +254,13 @@ void graph::print_debug(bool edges) const {
   if (edges) {
     for (int u = 0; u < adj.size(); u++)
       for (int v : adj[u])
-        if (v > u) printf("%d %d\n", u + 1, v + 1);
+        if (v > u) printf("%d %d\n", user_friendly(u), user_friendly(v));
     return;
   }
 
   for (int u = 0; u < adj.size(); u++) {
-    printf("%d:", u + 1);
-    for (int v : adj[u]) printf(" %d", v + 1);
+    printf("%d:", user_friendly(u));
+    for (int v : adj[u]) printf(" %d", user_friendly(v));
     printf("\n");
   }
   printf("----\n");

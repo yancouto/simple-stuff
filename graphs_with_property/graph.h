@@ -42,11 +42,10 @@ enum Format {
 struct graph {
  public:
   graph() {}
-  graph(const graph& other) : adj(other.adj), m(other.m) {}
   // IO
   static void to_file(const vector<graph>& gs, const string& filename,
                       Format format);
-  static vector<graph> from_file(const string& filename, Format format);
+  static vector<graph> from_file(std::istream& infile, Format format);
   void validate() const;
   // properties
   int degree(int u) const { return adj[u].size(); }
@@ -119,9 +118,14 @@ struct graph {
   bool operator==(const graph& other) const { return adj == other.adj; }
   bool operator!=(const graph& other) const { return !(*this == other); }
 
+  int user_friendly(int u) const {
+    return mapping.size() > u ? mapping[u] : u + 1;
+  }
+
   void print_debug(bool edges = false) const;
   // vertices in 0..n-1
   vector<vector<int>> adj;
+  vector<int> mapping;
   // Stored for convenience
   int m = 0;
 };

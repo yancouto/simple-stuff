@@ -31,7 +31,7 @@ graph create_counter() {
 
 vector<graph> get_graphs() {
   if (READ_SINGLE_INPUT)
-    return graph::from_file("input.txt", Format::EDGES);
+    return graph::from_file(std::cin, Format::EDGES);
   else
     return {create_counter()};
 }
@@ -47,7 +47,7 @@ int main() {
     else {
       assert(g.is_forest_cut(cut));
       printf("Cut:");
-      for (int v : cut) printf(" %d", v + 1);
+      for (int v : cut) printf(" %d", g.user_friendly(v));
       putchar('\n');
       g.print_debug();
     }
