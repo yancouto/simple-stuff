@@ -6,7 +6,7 @@
 
 typedef std::pair<int, int> edge;
 
-const bool READ_SINGLE_INPUT = false;
+const bool READ_SINGLE_INPUT = true;
 
 graph create_counter() {
   graph g;
