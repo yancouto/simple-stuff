@@ -83,7 +83,7 @@ struct graph6_reader_iterable {
     return graph6_reader_iterator(std::istream_iterator<unsigned char>(infile));
   }
   graph6_reader_iterator end() { return graph6_reader_iterator(); }
-  auto to_view() {
+  /*auto to_view() {
     auto it = begin();
     auto last = end();
     return views::repeat(0) | views::transform([=](int) mutable {
@@ -92,7 +92,7 @@ struct graph6_reader_iterable {
              ++it;
              return g;
            });
-  }
+  }*/
 };
 
 vector<graph> graph::from_file(const string& filename, Format format) {
@@ -313,14 +313,17 @@ struct forest_cut_builder {
       // We found a forest-cut! Idc if it's actually minimal.
       if (!g.induced_subgraph(g.vertices_complement(cut_so_far)).is_connected())
         return true;
-      bool can_be_minimal = std::ranges::all_of(cut_so_far, [&](int u) {
-        // trivially true
-        if (g.degree(u) >= cut_so_far.size() - 1 + 2) return true;
+      int u;
+      for (u = 0; u < cut_so_far.size(); u++) {
+        if (g.degree(cut_so_far[u]) >= cut_so_far.size() - 1 + 2) continue;
         vector<int> adj_outside_cut;
-        std::ranges::set_difference(g.adj[u], cut_so_far,
-                                    std::back_inserter(adj_outside_cut));
-        return adj_outside_cut.size() >= 2;
-      });
+        std::set_difference(g.adj[cut_so_far[u]].begin(),
+                            g.adj[cut_so_far[u]].end(), cut_so_far.begin(),
+                            cut_so_far.end(),
+                            std::back_inserter(adj_outside_cut));
+        if (adj_outside_cut.size() < 2) break;
+      }
+      bool can_be_minimal = u == cut_so_far.size();
       if (can_be_minimal && (*this)(next_u_to_add + 1)) return true;
     }
     cut_so_far.pop_back();

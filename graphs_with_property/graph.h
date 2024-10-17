@@ -3,7 +3,6 @@
 #include <chrono>
 #include <iostream>
 #include <numeric>
-#include <ranges>
 #include <string>
 #include <vector>
 
@@ -68,10 +67,6 @@ struct graph {
     return m;
   }
   int vertex_count() const { return adj.size(); }
-  auto vertices(int start = 0) const {
-    return std::ranges::views::iota(std::min<int>(start, adj.size()),
-                                    (int)adj.size());
-  }
   bool is_connected() const;
   bool is_acyclic() const;
   // Does the neighborhood of u induce an acyclic graph?
