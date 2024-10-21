@@ -1,7 +1,7 @@
 use std::collections::{btree_map::Entry, BTreeMap};
 
-use chrono::{DateTime, NaiveDate, Timelike, Utc};
-use chrono_tz::America::Sao_Paulo;
+use anyhow::Context;
+use chrono::{DateTime, NaiveDate, NaiveTime, Timelike, Utc};
 use notion_client::{
     endpoints::{
         blocks::append::request::AppendBlockChildrenRequestBuilder,
@@ -37,21 +37,12 @@ const MOOD: &str = "Mood";
 const TAGS: &str = "Tags";
 const DATE: &str = "Date";
 const STREAM_OF_CONSCIOUSNESS: &str = "Stream of conciousness";
+const CORRECT_TIMEZONE: chrono_tz::Tz = chrono_tz::America::Sao_Paulo;
 
 impl NotionManager {
     pub async fn new() -> anyhow::Result<Self> {
         let api = Client::new(std::env::var("NOTION_TOKEN")?, None)?;
         let db_id = std::env::var("NOTION_DATABASE_ID")?;
-        // I don't really need to fetch the full database here, but it's good to crash early.
-        let db = api.databases.retrieve_a_database(&db_id).await?;
-        log::info!(
-            "Successfully accessed database: {}.",
-            db.title
-                .first()
-                .and_then(|t| t.plain_text())
-                .as_deref()
-                .unwrap_or("unknown")
-        );
         Ok(Self {
             api,
             db_id: DatabaseId(db_id),
@@ -59,20 +50,46 @@ impl NotionManager {
         })
     }
 
-    fn fix_date(date: DateTime<Utc>) -> DateTime<Utc> {
-        let date = date.with_timezone(&Sao_Paulo);
+    pub async fn check_can_access_database(&self) -> anyhow::Result<()> {
+        let db = self
+            .api
+            .databases
+            .retrieve_a_database(&self.db_id.0)
+            .await?;
+        log::info!(
+            "Successfully accessed database: {}.",
+            db.title
+                .first()
+                .context("Database has no title")?
+                .plain_text()
+                .context("Title is not plain text")?
+        );
+        Ok(())
+    }
+
+    /// Multiple fixes to the date. First, considers the correct timezone.
+    /// Then, considers the previous day if the time is before 6am (super reasonable for me).
+    /// Finally, sets the time to 00:00:00 to work with notion, and goes back to Utc.
+    fn fix_date(date: DateTime<Utc>) -> anyhow::Result<DateTime<Utc>> {
+        let date = date.with_timezone(&CORRECT_TIMEZONE);
         if date.hour() < 6 {
             date - chrono::Duration::days(1)
         } else {
             date
         }
         .with_timezone(&Utc)
+        .with_time(NaiveTime::MIN)
+        .single()
+        .context("Failed to set time")
     }
 
+    /// First try to get the previously created page with same date. Otherwise, create a new one.
+    /// Always cache in case we have multiple messages.
     async fn get_or_create_page(&mut self, date: DateTime<Utc>) -> Result<PageId, anyhow::Error> {
-        let date = Self::fix_date(date);
+        let date = Self::fix_date(date)?;
         let entry = self.page_cache.entry(date.date_naive());
-        match entry {
+        Ok(match entry {
+            Entry::Occupied(occupied_entry) => occupied_entry.get().clone(),
             Entry::Vacant(vacant_entry) => {
                 let filters = vec![
                     FilterType::Property {
@@ -96,9 +113,15 @@ impl NotionManager {
                             .build()?,
                     )
                     .await?;
-                if let Some(page) = res.results.into_iter().next() {
-                    Ok(PageId(page.id))
+                let id = if let Some(page) = res.results.into_iter().next() {
+                    log::debug!(
+                        "Found existing page with date: {}, url: {}",
+                        date.date_naive(),
+                        page.url
+                    );
+                    PageId(page.id)
                 } else {
+                    log::debug!("Creating new page with date: {}", date.date_naive());
                     let properties = BTreeMap::from([
                         (
                             TAGS.to_string(),
@@ -136,11 +159,11 @@ impl NotionManager {
                         )
                         .await?;
 
-                    Ok(vacant_entry.insert(PageId(page.id)).clone())
-                }
+                    PageId(page.id)
+                };
+                vacant_entry.insert(id).clone()
             }
-            Entry::Occupied(occupied_entry) => Ok(occupied_entry.get().clone()),
-        }
+        })
     }
 
     pub async fn set_mood(&mut self, mood: u8, date: DateTime<Utc>) -> Result<(), anyhow::Error> {

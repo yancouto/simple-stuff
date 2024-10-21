@@ -50,6 +50,10 @@ async fn poll_once() -> anyhow::Result<()> {
                 ..
             }) = update.kind
             {
+                if msg_count == 0 {
+                    // Let's fail fast if we can't talk to Notion at all.
+                    notion.check_can_access_database().await?;
+                }
                 msg_count += 1;
                 let res = Command::parse_or_text(text)
                     .handle(&bot, date, &mut notion)
@@ -64,7 +68,8 @@ async fn poll_once() -> anyhow::Result<()> {
                 log::info!("Not a text message: {:?}", update);
             }
         }
-        // If everything failed, notion is likely down, let's not ack the messages.
+        // If everything failed, Notion is likely down, let's not ack the messages
+        // and hope it works later.
         if off.is_none() || !any_success {
             break;
         }

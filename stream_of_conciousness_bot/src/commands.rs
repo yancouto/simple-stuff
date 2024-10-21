@@ -25,6 +25,7 @@ impl Command {
         date: DateTime<Utc>,
         notion: &mut NotionManager,
     ) -> anyhow::Result<()> {
+        let date = date - chrono::Duration::days(2);
         match self {
             Self::Mood(mood) => notion.set_mood(mood, date).await,
             Self::Text(text) => notion.add_text(text, date).await,
