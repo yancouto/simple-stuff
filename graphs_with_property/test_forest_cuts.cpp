@@ -7,7 +7,7 @@
 // input file
 const string input_filename = "input.g6";
 const bool FIND_TRIVIAL = false;
-const bool FIND_INDUCTION = false;
+const bool FIND_INDUCTION = true;
 
 int main() {
   printf("Starting.\n");

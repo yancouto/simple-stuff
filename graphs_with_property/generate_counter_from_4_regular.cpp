@@ -17,6 +17,7 @@ const string input_filename = "input.g6";
 
 bool add_triangle_to_induced(graph &g, const vector<int> &vxs) {
   int vn = vxs.size();
+  assert(vn >= 3);
   graph h = g.induced_subgraph(vxs);
   if (!h.is_acyclic()) return true;
   int tr[3] = {-1, -1, -1};
@@ -67,7 +68,7 @@ graph increment_graph(graph &orig) {
           max_m);
     while (g.edge_count() < max_m) {
       vector<int> cut = g.non_trivial_forest_cut();
-      if (cut.empty() || !add_triangle_to_induced(g, cut)) break;
+      if (cut.size() < 3 || !add_triangle_to_induced(g, cut)) break;
     }
     debug("With cycles in most neighborhoods: n=%d m=%d >? %d\n", n,
           g.edge_count(), max_m);
@@ -166,6 +167,7 @@ auto reg_blowup_generator(auto graphs_reg, vector<vector<int>> kks) {
            debug("Applying blowups\n");
            for (int k : ks) {
              debug("[%.2fs] Applying blowup %d\n", t.peek(), k);
+             if (k == 1) continue;
              int on = g.vertex_count();
              if (g.edge_count() + on * (k * (k - 1)) / 2 >= 3 * (k * on) - 6) {
                debug("Skipping blowup %d\n", k);
@@ -194,14 +196,14 @@ auto reg_blowup_generator(auto graphs_reg, vector<vector<int>> kks) {
          views::join;
 }
 
-const bool USE_STDIN = false;
+const bool BLOWUP = true;
 
 int main() {
   printf("Starting.\n");
   srand(time(NULL));
-  if (USE_STDIN)
+  if (!BLOWUP)
     check_all(graph6_reader_iterable(std::cin));
   else
     check_all(reg_blowup_generator(graph6_reader_iterable(std::cin).to_view(),
-                                   {{5}, {4, 5}, {5, 5}}));
+                                   {{1}, {4}, {5}, {6}}));
 }

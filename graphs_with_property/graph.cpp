@@ -14,7 +14,7 @@ using namespace std::ranges;
 
 #define debug(...) (void)0
 // #define debug(...) printf(__VA_ARGS__)
-//  Remove assert if we trust the code
+//   Remove assert if we trust the code
 #undef assert
 #define assert(...) (void)0
 
