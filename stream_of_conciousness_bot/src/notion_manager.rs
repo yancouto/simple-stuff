@@ -18,7 +18,8 @@ use notion_client::{
     },
     objects::{
         block::{Block, BlockType, ParagraphValue},
-        page::{DateOrDateTime, DatePropertyValue, PageProperty, SelectPropertyValue},
+        emoji::Emoji,
+        page::{DateOrDateTime, DatePropertyValue, Icon, PageProperty, SelectPropertyValue},
         parent::Parent,
         rich_text::{RichText, Text},
     },
@@ -37,6 +38,7 @@ pub struct NotionManager {
 const MOOD: &str = "Mood";
 const TAGS: &str = "Tags";
 const DATE: &str = "Date";
+const TITLE: &str = "title"; // Default and lowercase in notion
 const STREAM_OF_CONSCIOUSNESS: &str = "Stream of conciousness";
 const CORRECT_TIMEZONE: chrono_tz::Tz = chrono_tz::America::Sao_Paulo;
 
@@ -142,6 +144,19 @@ impl NotionManager {
                                     time_zone: None,
                                 }),
                             },
+                        TITLE.to_string() =>
+                            PageProperty::Title {
+                                id: None,
+                                title: vec![RichText::Text {
+                                    text: Text {
+                                        content: date.date_naive().to_string(),
+                                        link: None,
+                                    },
+                                    annotations: None,
+                                    plain_text: None,
+                                    href: None,
+                                }],
+                            },
                     };
                     let page = self
                         .api
@@ -152,6 +167,9 @@ impl NotionManager {
                                     database_id: self.db_id.0.clone(),
                                 })
                                 .properties(properties)
+                                .icon(Icon::Emoji(Emoji {
+                                    emoji: "💭".to_string(),
+                                }))
                                 .build()?,
                         )
                         .await?;
