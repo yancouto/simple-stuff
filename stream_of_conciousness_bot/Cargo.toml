@@ -4,3 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+teloxide = { version = "0.13", features = ["macros"] }
+tokio = { version = "*", features = ["macros", "rt-multi-thread"] }
+pretty_env_logger = "*"
+log = "*"
