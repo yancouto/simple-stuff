@@ -63,7 +63,6 @@ impl NotionCommand {
                 if date1 == date2 =>
             {
                 let combined: Vec<_> = text1.into_iter().chain(text2).collect();
-                assert!(combined.is_sorted_by_key(|(_, time)| *time));
                 Ok(NotionCommand::Text(combined, date1))
             }
             (Some(a), b) => Err((a, b)),
@@ -72,14 +71,9 @@ impl NotionCommand {
 
     pub async fn execute(&self, notion: &mut NotionManager) -> Result<(), anyhow::Error> {
         match self {
-            NotionCommand::Mood(mood, date) => notion.set_mood(*mood, *date).await?,
-            NotionCommand::Text(texts, date) => {
-                for (text, time) in texts {
-                    notion.add_text(text, *date).await?;
-                }
-            }
+            NotionCommand::Mood(mood, date) => notion.set_mood(*mood, *date).await,
+            NotionCommand::Text(texts, date) => notion.add_text(texts, *date).await,
         }
-        Ok(())
     }
 
     /// Returns wheter it was a success
@@ -234,33 +228,39 @@ impl NotionManager {
         Ok(())
     }
 
-    pub async fn add_text(&mut self, text: &str, date: NaiveDate) -> Result<(), anyhow::Error> {
-        // TODO: This can be easily batched. I'm not sure yet at which level.
-        log::trace!("Adding text to Notion: {}", text);
+    pub async fn add_text(
+        &mut self,
+        all_text: &[(String, NaiveTime)],
+        date: NaiveDate,
+    ) -> Result<(), anyhow::Error> {
+        log::trace!("Adding text to Notion: {:?}", all_text);
         let id = self.get_or_create_page(date).await?;
-        let block = Block {
-            block_type: BlockType::Paragraph {
-                paragraph: ParagraphValue {
-                    rich_text: vec![RichText::Text {
-                        text: Text {
-                            content: text.to_string(),
-                            link: None,
-                        },
-                        annotations: None,
-                        plain_text: None,
-                        href: None,
-                    }],
-                    ..Default::default()
+        let blocks = all_text
+            .into_iter()
+            .map(|(text, time)| Block {
+                block_type: BlockType::Paragraph {
+                    paragraph: ParagraphValue {
+                        rich_text: vec![RichText::Text {
+                            text: Text {
+                                content: format!("[{}] {}", time.format("%H:%M"), text),
+                                link: None,
+                            },
+                            annotations: None,
+                            plain_text: None,
+                            href: None,
+                        }],
+                        ..Default::default()
+                    },
                 },
-            },
-            ..Default::default()
-        };
+                ..Default::default()
+            })
+            .collect();
         self.api
             .blocks
             .append_block_children(
                 &id.0,
                 AppendBlockChildrenRequestBuilder::default()
-                    .children(vec![block])
+                    .children(blocks)
                     .build()?,
             )
             .await?;
