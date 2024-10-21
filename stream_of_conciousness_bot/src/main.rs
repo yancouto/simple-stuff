@@ -20,12 +20,12 @@ async fn poll_once() -> anyhow::Result<()> {
 
     let mut notion = notion_manager::NotionManager::new().await?;
     let bot = Bot::new(std::env::var("TELEGRAM_TOKEN")?);
-    let mut msg_count = 0;
-    let mut success_count = 0;
+    let mut any_update = false;
+    let mut some_failures = false;
 
     let mut off = None;
 
-    loop {
+    let all_failure = loop {
         let updates = bot
             .get_updates()
             .with_payload_mut(|p| {
@@ -58,25 +58,28 @@ async fn poll_once() -> anyhow::Result<()> {
             })
             .collect();
 
-        if msg_count == 0 && !cmds.is_empty() {
+        if !any_update && !cmds.is_empty() {
             // Let's fail fast if we can't talk to Notion at all.
             notion.check_can_access_database().await?;
+            any_update = true;
         }
-        msg_count += cmds.len();
-        let cur_success_count = Command::handle(&bot, cmds, &mut notion).await?;
-        success_count += cur_success_count;
+        let (suc, tot) = Command::handle(&bot, cmds, &mut notion).await?;
+        some_failures = some_failures || suc < tot;
+        // No updates
+        if off.is_none() {
+            break false;
         // If everything failed, Notion is likely down, let's not ack the messages
         // and hope it works later.
-        if off.is_none() || cur_success_count == 0 {
-            break;
+        } else if suc == 0 {
+            break true;
         }
-    }
+    };
 
-    if success_count == msg_count {
-        Ok(())
-    } else if success_count > 0 {
+    if all_failure {
+        anyhow::bail!("All messages failed, will try again later.")
+    } else if some_failures {
         anyhow::bail!("Some errors occurred, but some successes, continuing.")
     } else {
-        anyhow::bail!("All messages failed, will try again later.")
+        Ok(())
     }
 }

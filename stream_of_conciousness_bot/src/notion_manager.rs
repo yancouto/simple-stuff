@@ -1,7 +1,7 @@
 use std::collections::{btree_map::Entry, BTreeMap};
 
 use anyhow::Context;
-use chrono::{DateTime, NaiveDate, NaiveTime, Timelike, Utc};
+use chrono::{NaiveDate, NaiveTime};
 use maplit::btreemap;
 use notion_client::{
     endpoints::{
@@ -40,7 +40,58 @@ const TAGS: &str = "Tags";
 const DATE: &str = "Date";
 const TITLE: &str = "title"; // Default and lowercase in notion
 const STREAM_OF_CONSCIOUSNESS: &str = "Stream of conciousness";
-const CORRECT_TIMEZONE: chrono_tz::Tz = chrono_tz::America::Sao_Paulo;
+/// The day actually changes at 6am.
+pub const HOUR_CUT_TO_NEXT_DAY: u32 = 6;
+
+#[derive(Debug)]
+pub enum NotionCommand {
+    Mood(u8, NaiveDate),
+    /// Note that the NaiveTime might actually be from the next day.
+    Text(Vec<(String, NaiveTime)>, NaiveDate),
+}
+
+impl NotionCommand {
+    pub fn try_merge(maybe_self: Option<Self>, other: Self) -> Result<Self, (Self, Self)> {
+        match (maybe_self, other) {
+            (None, other) => Ok(other),
+            (Some(NotionCommand::Mood(mood1, date1)), NotionCommand::Mood(mood2, date2))
+                if date1 == date2 =>
+            {
+                Ok(NotionCommand::Mood(mood1.min(mood2), date1))
+            }
+            (Some(NotionCommand::Text(text1, date1)), NotionCommand::Text(text2, date2))
+                if date1 == date2 =>
+            {
+                let combined: Vec<_> = text1.into_iter().chain(text2).collect();
+                assert!(combined.is_sorted_by_key(|(_, time)| *time));
+                Ok(NotionCommand::Text(combined, date1))
+            }
+            (Some(a), b) => Err((a, b)),
+        }
+    }
+
+    pub async fn execute(&self, notion: &mut NotionManager) -> Result<(), anyhow::Error> {
+        match self {
+            NotionCommand::Mood(mood, date) => notion.set_mood(*mood, *date).await?,
+            NotionCommand::Text(texts, date) => {
+                for (text, time) in texts {
+                    notion.add_text(text, *date).await?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Returns wheter it was a success
+    pub async fn execute_or_log(&self, notion: &mut NotionManager) -> bool {
+        if let Err(e) = self.execute(notion).await {
+            log::error!("Error handling command: {:?}, error: {:?}", self, e);
+            false
+        } else {
+            true
+        }
+    }
+}
 
 impl NotionManager {
     pub async fn new() -> anyhow::Result<Self> {
@@ -70,34 +121,19 @@ impl NotionManager {
         Ok(())
     }
 
-    /// Multiple fixes to the date. First, considers the correct timezone.
-    /// Then, considers the previous day if the time is before 6am (super reasonable for me).
-    /// Finally, sets the time to 00:00:00 to work with notion, and goes back to Utc.
-    fn fix_date(date: DateTime<Utc>) -> anyhow::Result<DateTime<Utc>> {
-        let date = date.with_timezone(&CORRECT_TIMEZONE);
-        if date.hour() < 6 {
-            date - chrono::Duration::days(1)
-        } else {
-            date
-        }
-        .with_timezone(&Utc)
-        .with_time(NaiveTime::MIN)
-        .single()
-        .context("Failed to set time")
-    }
-
     /// First try to get the previously created page with same date. Otherwise, create a new one.
     /// Always cache in case we have multiple messages.
-    async fn get_or_create_page(&mut self, date: DateTime<Utc>) -> Result<PageId, anyhow::Error> {
-        let date = Self::fix_date(date)?;
-        let entry = self.page_cache.entry(date.date_naive());
+    async fn get_or_create_page(&mut self, date: NaiveDate) -> Result<PageId, anyhow::Error> {
+        let entry = self.page_cache.entry(date);
         Ok(match entry {
             Entry::Occupied(occupied_entry) => occupied_entry.get().clone(),
             Entry::Vacant(vacant_entry) => {
                 let filters = vec![
                     FilterType::Property {
                         property: DATE.to_string(),
-                        condition: PropertyCondition::Date(DateCondition::Equals(date)),
+                        condition: PropertyCondition::Date(DateCondition::Equals(
+                            date.and_time(NaiveTime::MIN).and_utc(),
+                        )),
                     },
                     FilterType::Property {
                         property: TAGS.to_string(),
@@ -117,14 +153,10 @@ impl NotionManager {
                     )
                     .await?;
                 let id = if let Some(page) = res.results.into_iter().next() {
-                    log::debug!(
-                        "Found existing page with date: {}, url: {}",
-                        date.date_naive(),
-                        page.url
-                    );
+                    log::debug!("Found existing page with date: {}, url: {}", date, page.url);
                     PageId(page.id)
                 } else {
-                    log::debug!("Creating new page with date: {}", date.date_naive());
+                    log::debug!("Creating new page with date: {}", date);
                     let properties = btreemap! {
                         TAGS.to_string() =>
                             PageProperty::MultiSelect {
@@ -139,7 +171,7 @@ impl NotionManager {
                             PageProperty::Date {
                                 id: None,
                                 date: Some(DatePropertyValue {
-                                    start: Some(DateOrDateTime::Date(date.date_naive())),
+                                    start: Some(DateOrDateTime::Date(date)),
                                     end: None,
                                     time_zone: None,
                                 }),
@@ -149,7 +181,7 @@ impl NotionManager {
                                 id: None,
                                 title: vec![RichText::Text {
                                     text: Text {
-                                        content: date.date_naive().to_string(),
+                                        content: date.to_string(),
                                         link: None,
                                     },
                                     annotations: None,
@@ -181,7 +213,7 @@ impl NotionManager {
         })
     }
 
-    pub async fn set_mood(&mut self, mood: u8, date: DateTime<Utc>) -> Result<(), anyhow::Error> {
+    pub async fn set_mood(&mut self, mood: u8, date: NaiveDate) -> Result<(), anyhow::Error> {
         log::trace!("Setting mood to Notion: {}", mood);
         let id = self.get_or_create_page(date).await?;
         self.api
@@ -202,7 +234,7 @@ impl NotionManager {
         Ok(())
     }
 
-    pub async fn add_text(&mut self, text: &str, date: DateTime<Utc>) -> Result<(), anyhow::Error> {
+    pub async fn add_text(&mut self, text: &str, date: NaiveDate) -> Result<(), anyhow::Error> {
         // TODO: This can be easily batched. I'm not sure yet at which level.
         log::trace!("Adding text to Notion: {}", text);
         let id = self.get_or_create_page(date).await?;
