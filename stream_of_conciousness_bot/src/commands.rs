@@ -20,14 +20,22 @@ impl Command {
         Self::parse(&text, "").unwrap_or_else(|_| Self::Text(text))
     }
     pub async fn handle(
-        self,
         _bot: &Bot,
-        date: DateTime<Utc>,
+        cmds: Vec<(Command, DateTime<Utc>)>,
         notion: &mut NotionManager,
-    ) -> anyhow::Result<()> {
-        match self {
-            Self::Mood(mood) => notion.set_mood(mood, date).await,
-            Self::Text(text) => notion.add_text(text, date).await,
+    ) -> anyhow::Result<usize> {
+        let mut success = 0;
+        for (cmd, date) in cmds {
+            let res = match &cmd {
+                Self::Mood(mood) => notion.set_mood(*mood, date).await,
+                Self::Text(text) => notion.add_text(text, date).await,
+            };
+            if let Err(e) = &res {
+                log::error!("Error handling command: {:?}, error: {:?}", cmd, e);
+            } else {
+                success += 1;
+            }
         }
+        Ok(success)
     }
 }

@@ -202,11 +202,7 @@ impl NotionManager {
         Ok(())
     }
 
-    pub async fn add_text(
-        &mut self,
-        text: String,
-        date: DateTime<Utc>,
-    ) -> Result<(), anyhow::Error> {
+    pub async fn add_text(&mut self, text: &str, date: DateTime<Utc>) -> Result<(), anyhow::Error> {
         // TODO: This can be easily batched. I'm not sure yet at which level.
         log::trace!("Adding text to Notion: {}", text);
         let id = self.get_or_create_page(date).await?;
@@ -215,7 +211,7 @@ impl NotionManager {
                 paragraph: ParagraphValue {
                     rich_text: vec![RichText::Text {
                         text: Text {
-                            content: text,
+                            content: text.to_string(),
                             link: None,
                         },
                         annotations: None,

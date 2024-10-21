@@ -21,7 +21,7 @@ async fn poll_once() -> anyhow::Result<()> {
     let mut notion = notion_manager::NotionManager::new().await?;
     let bot = Bot::new(std::env::var("TELEGRAM_TOKEN")?);
     let mut msg_count = 0;
-    let mut error_count = 0;
+    let mut success_count = 0;
 
     let mut off = None;
 
@@ -37,47 +37,44 @@ async fn poll_once() -> anyhow::Result<()> {
 
         off = updates.last().map(|u| u.id.as_offset());
 
-        let mut any_success = false;
-
-        for update in updates {
-            if let UpdateKind::Message(Message {
-                date,
-                kind:
-                    MessageKind::Common(MessageCommon {
-                        media_kind: MediaKind::Text(MediaText { text, .. }),
-                        ..
-                    }),
-                ..
-            }) = update.kind
-            {
-                if msg_count == 0 {
-                    // Let's fail fast if we can't talk to Notion at all.
-                    notion.check_can_access_database().await?;
-                }
-                msg_count += 1;
-                let res = Command::parse_or_text(text)
-                    .handle(&bot, date, &mut notion)
-                    .await;
-                if let Err(e) = res {
-                    log::error!("Error handling command: {:?}", e);
-                    error_count += 1;
+        let cmds: Vec<_> = updates
+            .into_iter()
+            .flat_map(|update| {
+                if let UpdateKind::Message(Message {
+                    date,
+                    kind:
+                        MessageKind::Common(MessageCommon {
+                            media_kind: MediaKind::Text(MediaText { text, .. }),
+                            ..
+                        }),
+                    ..
+                }) = update.kind
+                {
+                    Some((Command::parse_or_text(text), date))
                 } else {
-                    any_success = true;
+                    log::info!("Not a text message: {:?}", update);
+                    None
                 }
-            } else {
-                log::info!("Not a text message: {:?}", update);
-            }
+            })
+            .collect();
+
+        if msg_count == 0 && !cmds.is_empty() {
+            // Let's fail fast if we can't talk to Notion at all.
+            notion.check_can_access_database().await?;
         }
+        msg_count += cmds.len();
+        let cur_success_count = Command::handle(&bot, cmds, &mut notion).await?;
+        success_count += cur_success_count;
         // If everything failed, Notion is likely down, let's not ack the messages
         // and hope it works later.
-        if off.is_none() || !any_success {
+        if off.is_none() || cur_success_count == 0 {
             break;
         }
     }
 
-    if error_count == 0 {
+    if success_count == msg_count {
         Ok(())
-    } else if error_count < msg_count {
+    } else if success_count > 0 {
         anyhow::bail!("Some errors occurred, but some successes, continuing.")
     } else {
         anyhow::bail!("All messages failed, will try again later.")
