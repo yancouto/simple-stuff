@@ -2,6 +2,7 @@ use std::collections::{btree_map::Entry, BTreeMap};
 
 use anyhow::Context;
 use chrono::{DateTime, NaiveDate, NaiveTime, Timelike, Utc};
+use maplit::btreemap;
 use notion_client::{
     endpoints::{
         blocks::append::request::AppendBlockChildrenRequestBuilder,
@@ -122,9 +123,8 @@ impl NotionManager {
                     PageId(page.id)
                 } else {
                     log::debug!("Creating new page with date: {}", date.date_naive());
-                    let properties = BTreeMap::from([
-                        (
-                            TAGS.to_string(),
+                    let properties = btreemap! {
+                        TAGS.to_string() =>
                             PageProperty::MultiSelect {
                                 id: None,
                                 multi_select: vec![SelectPropertyValue {
@@ -133,9 +133,7 @@ impl NotionManager {
                                     id: None,
                                 }],
                             },
-                        ),
-                        (
-                            DATE.to_string(),
+                        DATE.to_string() =>
                             PageProperty::Date {
                                 id: None,
                                 date: Some(DatePropertyValue {
@@ -144,8 +142,7 @@ impl NotionManager {
                                     time_zone: None,
                                 }),
                             },
-                        ),
-                    ]);
+                    };
                     let page = self
                         .api
                         .pages
@@ -174,13 +171,13 @@ impl NotionManager {
             .update_page_properties(
                 &id.0,
                 UpdatePagePropertiesRequestBuilder::default()
-                    .properties(BTreeMap::from([(
-                        MOOD.to_string(),
-                        Some(PageProperty::Number {
-                            id: None,
-                            number: Some(mood.into()),
-                        }),
-                    )]))
+                    .properties(btreemap! {
+                        MOOD.to_string() =>
+                            Some(PageProperty::Number {
+                                id: None,
+                                number: Some(mood.into()),
+                            }),
+                    })
                     .build()?,
             )
             .await?;
