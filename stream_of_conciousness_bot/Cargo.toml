@@ -9,3 +9,6 @@ tokio = { version = "*", features = ["macros", "rt-multi-thread"] }
 pretty_env_logger = "*"
 log = "*"
 anyhow = "*"
+notion-client = "1"
+chrono = "*"
+chrono-tz = "*"

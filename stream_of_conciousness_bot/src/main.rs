@@ -2,9 +2,12 @@ use teloxide::{
     prelude::*,
     requests::HasPayload,
     types::{AllowedUpdate, MediaKind, MediaText, MessageCommon, MessageKind, UpdateKind},
-    utils::command::BotCommands,
-    RequestError,
 };
+
+mod commands;
+mod notion_manager;
+
+use commands::Command;
 
 #[tokio::main]
 async fn main() {
@@ -15,7 +18,8 @@ async fn poll_once() -> anyhow::Result<()> {
     pretty_env_logger::init_timed();
     log::info!("Polling all pending messages from bot...");
 
-    let bot = Bot::from_env();
+    let mut notion = notion_manager::NotionManager::new().await?;
+    let bot = Bot::new(std::env::var("TELEGRAM_TOKEN")?);
     let mut msg_count = 0;
     let mut error_count = 0;
 
@@ -37,18 +41,18 @@ async fn poll_once() -> anyhow::Result<()> {
 
         for update in updates {
             if let UpdateKind::Message(Message {
+                date,
                 kind:
                     MessageKind::Common(MessageCommon {
                         media_kind: MediaKind::Text(MediaText { text, .. }),
                         ..
                     }),
                 ..
-            }) = &update.kind
+            }) = update.kind
             {
                 msg_count += 1;
-                let res = Command::parse(text, "")
-                    .unwrap_or_else(|_| Command::Text(text.clone()))
-                    .handler(&bot)
+                let res = Command::parse_or_text(text)
+                    .handle(&bot, date, &mut notion)
                     .await;
                 if let Err(e) = res {
                     log::error!("Error handling command: {:?}", e);
@@ -72,31 +76,5 @@ async fn poll_once() -> anyhow::Result<()> {
         anyhow::bail!("Some errors occurred, but some successes, continuing.")
     } else {
         anyhow::bail!("All messages failed, will try again later.")
-    }
-}
-
-#[derive(BotCommands, Clone, Debug)]
-#[command(
-    rename_rule = "lowercase",
-    description = "These commands are supported:"
-)]
-enum Command {
-    #[command(description = "display this text.")]
-    Help,
-    #[command(description = "your current mood in a 0-100 scale.")]
-    Mood(u8),
-    #[command(hide)]
-    Text(String),
-}
-
-impl Command {
-    async fn handler(self, bot: &Bot) -> ResponseResult<()> {
-        log::error!("AAA: {:?}", self);
-        if let Self::Text(text) = self {
-            if text == "P" {
-                return Ok(());
-            }
-        }
-        Err(RequestError::Io(std::io::Error::other("dang")))
     }
 }
