@@ -1,4 +1,7 @@
-use std::collections::{btree_map::Entry, BTreeMap};
+use std::{
+    collections::{btree_map::Entry, BTreeMap, BTreeSet},
+    usize,
+};
 
 use anyhow::Context;
 use chrono::{NaiveDate, NaiveTime};
@@ -18,27 +21,29 @@ use notion_client::{
     },
     objects::{
         block::{Block, BlockType, ParagraphValue},
+        database::DatabaseProperty,
         emoji::Emoji,
-        page::{DateOrDateTime, DatePropertyValue, Icon, PageProperty, SelectPropertyValue},
+        page::{DateOrDateTime, DatePropertyValue, Icon, Page, PageProperty, SelectPropertyValue},
         parent::Parent,
         rich_text::{RichText, Text},
     },
 };
-#[derive(Clone)]
-struct PageId(String);
+use unidecode::unidecode;
 #[derive(Clone)]
 struct DatabaseId(String);
 
 pub struct NotionManager {
     api: Client,
     db_id: DatabaseId,
-    page_cache: BTreeMap<NaiveDate, PageId>,
+    page_cache: BTreeMap<NaiveDate, Page>,
+    people: BTreeSet<String>,
 }
 
 const MOOD: &str = "Mood";
 const TAGS: &str = "Tags";
 const DATE: &str = "Date";
 const TITLE: &str = "title"; // Default and lowercase in notion
+const PEOPLE: &str = "Pessoas";
 const STREAM_OF_CONSCIOUSNESS: &str = "Stream of conciousness";
 /// The day actually changes at 6am.
 pub const HOUR_CUT_TO_NEXT_DAY: u32 = 6;
@@ -48,6 +53,7 @@ pub enum NotionCommand {
     Mood(u8, NaiveDate),
     /// Note that the NaiveTime might actually be from the next day.
     Text(Vec<(String, NaiveTime)>, NaiveDate),
+    People(Vec<String>, NaiveDate),
 }
 
 impl NotionCommand {
@@ -65,14 +71,22 @@ impl NotionCommand {
                 let combined: Vec<_> = text1.into_iter().chain(text2).collect();
                 Ok(NotionCommand::Text(combined, date1))
             }
+            (
+                Some(NotionCommand::People(people1, date1)),
+                NotionCommand::People(people2, date2),
+            ) if date1 == date2 => {
+                let combined: Vec<_> = people1.into_iter().chain(people2).collect();
+                Ok(NotionCommand::People(combined, date1))
+            }
             (Some(a), b) => Err((a, b)),
         }
     }
 
     pub async fn execute(&self, notion: &mut NotionManager) -> Result<(), anyhow::Error> {
         match self {
-            NotionCommand::Mood(mood, date) => notion.set_mood(*mood, *date).await,
-            NotionCommand::Text(texts, date) => notion.add_text(texts, *date).await,
+            Self::Mood(mood, date) => notion.set_mood(*mood, *date).await,
+            Self::Text(texts, date) => notion.add_text(texts, *date).await,
+            Self::People(people, date) => notion.add_people(people, *date).await,
         }
     }
 
@@ -95,15 +109,24 @@ impl NotionManager {
             api,
             db_id: DatabaseId(db_id),
             page_cache: BTreeMap::new(),
+            people: BTreeSet::new(),
         })
     }
 
-    pub async fn check_can_access_database(&self) -> anyhow::Result<()> {
+    pub async fn check_can_access_database(&mut self) -> anyhow::Result<()> {
         let db = self
             .api
             .databases
             .retrieve_a_database(&self.db_id.0)
             .await?;
+        if let Some(DatabaseProperty::MultiSelect { multi_select, .. }) = db.properties.get(PEOPLE)
+        {
+            for opt in &multi_select.options {
+                self.people.insert(opt.name.clone());
+            }
+        } else {
+            anyhow::bail!("Database has no people");
+        }
         log::info!(
             "Successfully accessed database: {}.",
             db.title
@@ -117,10 +140,13 @@ impl NotionManager {
 
     /// First try to get the previously created page with same date. Otherwise, create a new one.
     /// Always cache in case we have multiple messages.
-    async fn get_or_create_page(&mut self, date: NaiveDate) -> Result<PageId, anyhow::Error> {
+    async fn get_or_create_page<'a>(
+        &'a mut self,
+        date: NaiveDate,
+    ) -> Result<&'a Page, anyhow::Error> {
         let entry = self.page_cache.entry(date);
         Ok(match entry {
-            Entry::Occupied(occupied_entry) => occupied_entry.get().clone(),
+            Entry::Occupied(occupied_entry) => occupied_entry.into_mut(),
             Entry::Vacant(vacant_entry) => {
                 let filters = vec![
                     FilterType::Property {
@@ -148,7 +174,7 @@ impl NotionManager {
                     .await?;
                 let id = if let Some(page) = res.results.into_iter().next() {
                     log::debug!("Found existing page with date: {}, url: {}", date, page.url);
-                    PageId(page.id)
+                    page
                 } else {
                     log::debug!("Creating new page with date: {}", date);
                     let properties = btreemap! {
@@ -199,21 +225,100 @@ impl NotionManager {
                                 .build()?,
                         )
                         .await?;
-
-                    PageId(page.id)
+                    page
                 };
-                vacant_entry.insert(id).clone()
+                vacant_entry.insert(id)
             }
         })
     }
 
-    pub async fn set_mood(&mut self, mood: u8, date: NaiveDate) -> Result<(), anyhow::Error> {
-        log::trace!("Setting mood to Notion: {}", mood);
-        let id = self.get_or_create_page(date).await?;
+    fn find_person<'a>(&'a self, name: &'a str) -> Option<&'a str> {
+        if self.people.contains(name) {
+            return Some(name);
+        }
+        let (mut min_dist, mut which) = (usize::MAX, None);
+        let name = unidecode(name).to_ascii_lowercase();
+        for person in &self.people {
+            let lower_person = unidecode(person).to_ascii_lowercase();
+            let dist = lower_person
+                .split_whitespace()
+                .chain(std::iter::once(lower_person.as_str()))
+                .map(|p| edit_distance::edit_distance(name.as_str(), p))
+                .min()
+                .unwrap_or(usize::MAX);
+            if dist < min_dist && (dist == 0 || dist < 4.min(name.len().saturating_sub(3))) {
+                min_dist = dist;
+                which = Some(person.as_str());
+            } else if dist == min_dist {
+                which = None; // Ambiguous
+            }
+        }
+        if which.is_none() {
+            log::warn!("Didn't find person: {}", name);
+        }
+        which
+    }
+
+    pub async fn add_people(
+        &mut self,
+        people: &[String],
+        date: NaiveDate,
+    ) -> Result<(), anyhow::Error> {
+        log::trace!("Adding people: {:?}", people);
+        let people: Vec<String> = people
+            .iter()
+            .filter_map(|p| self.find_person(p))
+            .map(ToString::to_string)
+            .collect();
+        let page = self.get_or_create_page(date).await?;
+        let all_people: BTreeSet<String> =
+            if let Some(PageProperty::MultiSelect { multi_select, .. }) =
+                page.properties.get(PEOPLE)
+            {
+                multi_select
+                    .iter()
+                    .filter_map(|p| p.name.clone())
+                    .chain(people)
+                    .collect()
+            } else {
+                anyhow::bail!("Page has no people property")
+            };
+        let multi_select = all_people
+            .into_iter()
+            .map(|name| SelectPropertyValue {
+                name: Some(name),
+                id: None,
+                color: None,
+            })
+            .collect();
+        let id = page.id.clone();
         self.api
             .pages
             .update_page_properties(
-                &id.0,
+                &id,
+                UpdatePagePropertiesRequestBuilder::default()
+                    .properties(btreemap! {
+                        PEOPLE.to_string() =>
+                            Some(PageProperty::MultiSelect {
+                                id: None,
+                                // TODO: Show errors to user.
+                                multi_select,
+                            }),
+                    })
+                    .build()?,
+            )
+            .await?;
+        Ok(())
+    }
+
+    pub async fn set_mood(&mut self, mood: u8, date: NaiveDate) -> Result<(), anyhow::Error> {
+        let mood = mood.clamp(0, 100);
+        log::trace!("Setting mood to Notion: {}", mood);
+        let id = self.get_or_create_page(date).await?.id.clone();
+        self.api
+            .pages
+            .update_page_properties(
+                &id,
                 UpdatePagePropertiesRequestBuilder::default()
                     .properties(btreemap! {
                         MOOD.to_string() =>
@@ -234,7 +339,7 @@ impl NotionManager {
         date: NaiveDate,
     ) -> Result<(), anyhow::Error> {
         log::trace!("Adding text to Notion: {:?}", all_text);
-        let id = self.get_or_create_page(date).await?;
+        let id = self.get_or_create_page(date).await?.id.clone();
         let blocks = all_text
             .into_iter()
             .map(|(text, time)| Block {
@@ -258,7 +363,7 @@ impl NotionManager {
         self.api
             .blocks
             .append_block_children(
-                &id.0,
+                &id,
                 AppendBlockChildrenRequestBuilder::default()
                     .children(blocks)
                     .build()?,

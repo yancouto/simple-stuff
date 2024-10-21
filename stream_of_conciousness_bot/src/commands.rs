@@ -11,6 +11,8 @@ use crate::notion_manager::{NotionCommand, NotionManager, HOUR_CUT_TO_NEXT_DAY};
 pub enum Command {
     #[command(description = "your current mood in a 0-100 scale.")]
     Mood(u8),
+    #[command(description = "people you mention", aliases = ["people", "mention"])]
+    Person(String),
     #[command(hide)]
     Text(String),
 }
@@ -48,6 +50,10 @@ impl Command {
             let new_cmd = match cmd {
                 Self::Mood(mood) => NotionCommand::Mood(mood, date),
                 Self::Text(text) => NotionCommand::Text(vec![(text, time)], date),
+                Self::Person(person) => NotionCommand::People(
+                    person.split(',').map(|s| s.trim().to_string()).collect(),
+                    date,
+                ),
             };
             match NotionCommand::try_merge(pending_cmd.take(), new_cmd) {
                 Ok(cmd) => pending_cmd = Some(cmd),

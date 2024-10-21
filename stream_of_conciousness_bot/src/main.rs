@@ -2,6 +2,7 @@ use teloxide::{
     prelude::*,
     requests::HasPayload,
     types::{AllowedUpdate, MediaKind, MediaText, MessageCommon, MessageKind, UpdateKind},
+    utils::command::BotCommands,
 };
 
 mod commands;
@@ -20,6 +21,12 @@ async fn poll_once() -> anyhow::Result<()> {
 
     let mut notion = notion_manager::NotionManager::new().await?;
     let bot = Bot::new(std::env::var("TELEGRAM_TOKEN")?);
+
+    if std::env::var("SET_COMMANDS").is_ok() {
+        log::info!("Setting commands using API");
+        bot.set_my_commands(Command::bot_commands()).send().await?;
+    }
+
     let mut any_update = false;
     let mut some_failures = false;
 
