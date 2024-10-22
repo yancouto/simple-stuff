@@ -12,7 +12,6 @@ use commands::Command;
 
 // TODO: Split polling from updating
 pub async fn poll_once_and_update_notion() -> anyhow::Result<()> {
-    pretty_env_logger::init_timed();
     log::info!("Polling all pending messages from bot...");
 
     let mut notion = notion_manager::NotionManager::new().await?;
