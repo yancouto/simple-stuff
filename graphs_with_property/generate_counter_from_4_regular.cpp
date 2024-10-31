@@ -157,20 +157,19 @@ bool breaks_conj_edge_nbh_2(const graph &g) {
 }
 
 void find_example(auto graphs, auto condition) {
-  time_count t, total_time;
+  time_count total_time;
+  log_exp_tracker log_exp;
   int tot = 0;
   for (graph g : graphs) {
     int n = g.vertex_count();
     if (n == 0) break;
     tot++;
-    if (t.peek() >= 30)
+    if (log_exp.should_log())
       printf("Testing graph %d (n=%d m=%d) after %.1fs...\n", tot, n,
-             g.edge_count(), total_time.peek()),
-          t.reset();
-    if (condition(g)) {
-      printf(">>>>> Found example\n");
-      g.print_debug(true);
-    }
+             g.edge_count(), total_time.peek()) if (condition(g)) {
+        printf(">>>>> Found example\n");
+        g.print_debug(true);
+      }
   }
 }
 

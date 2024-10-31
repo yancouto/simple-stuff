@@ -29,6 +29,20 @@ struct time_count {
   }
 };
 
+struct log_exp_tracker {
+  time_count t;
+  double cur_delay = 5;
+
+  bool should_log() {
+    if (t.peek() > cur_delay) {
+      cur_delay = min(2 * cur_delay, 60.0 * 60.0);
+      t.reset();
+      return true;
+    }
+    return false;
+  }
+};
+
 enum Format {
   // lines with "u: v1 v2 v3 ..." where u is the vertex and v1, v2, v3, ... are
   // the neighbors. Vertices in 1..n. Each graph is separated from the next by
