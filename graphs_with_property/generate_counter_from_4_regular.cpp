@@ -126,9 +126,58 @@ void check_all(auto graphs) {
   if (!any) printf(" No counterexample found.\n");
 }
 
+// G 3-conn, n >= 6, cycles in all vx and edge nbh => m >= 9n / 4
+// Found counter with n=9, no counter n=10..12
+bool breaks_conj_edge_nbh_1(const graph &g) {
+  int n = g.vertex_count();
+  if (n < 6) return false;
+  if (g.edge_count() * 4 >= 9 * n) {
+    printf("Please only use graphs with m < 9n / 4\n");
+    return false;
+  }
+  if (!g.has_cyclic_vx_neighborhood()) return false;
+  if (!g.is_3_connected()) return false;
+  if (!g.has_cyclic_edge_neighborhood()) return false;
+  return true;
+}
+
+// G 4-conn, n >= 7, cycles in all vx and edge nbh => m >= 9n / 4
+// Found counters with n=7..8, no counter n=9..12
+bool breaks_conj_edge_nbh_2(const graph &g) {
+  int n = g.vertex_count();
+  if (n < 7) return false;
+  if (g.edge_count() * 3 >= 7 * n) {
+    printf("Please only use graphs with m < 9n / 4\n");
+    return false;
+  }
+  if (!g.has_cyclic_vx_neighborhood()) return false;
+  if (!g.is_4_connected()) return false;
+  if (!g.has_cyclic_edge_neighborhood()) return false;
+  return true;
+}
+
+void find_example(auto graphs, auto condition) {
+  time_count t, total_time;
+  int tot = 0;
+  for (graph g : graphs) {
+    int n = g.vertex_count();
+    if (n == 0) break;
+    tot++;
+    if (t.peek() >= 30)
+      printf("Testing graph %d (n=%d m=%d) after %.1fs...\n", tot, n,
+             g.edge_count(), total_time.peek()),
+          t.reset();
+    if (condition(g)) {
+      printf(">>>>> Found example\n");
+      g.print_debug(true);
+    }
+  }
+}
+
 void blowup_vertex(graph &g, int u, int k) {
   int initial_degree = g.degree(u);
-  // not really necessary for this to work, but the graph will be weak otherwise
+  // not really necessary for this to work, but the graph will be weak
+  // otherwise
   assert(initial_degree >= 3);
   int n = g.vertex_count();
   // u will become a K_k with u, n, n + 1, .., n + k - 2
@@ -150,8 +199,8 @@ void blowup_vertex(graph &g, int u, int k) {
 
 // Generates graphs by starting with a regular graph and blowing up each
 // vertices into a K_k, k >= 3. For K4, this generates graphs where each
-// neighborhood has a triangle. If they were 3-regular, they now have 15n/8 < 2n
-// edges, if they were 4-regular, they now have 2n edges.
+// neighborhood has a triangle. If they were 3-regular, they now have 15n/8 <
+// 2n edges, if they were 4-regular, they now have 2n edges.
 auto reg_blowup_generator(auto graphs_reg, vector<vector<int>> kks) {
   return graphs_reg |
          views::transform([=](graph orig) -> vector<pair<graph, vector<int>>> {
@@ -196,14 +245,22 @@ auto reg_blowup_generator(auto graphs_reg, vector<vector<int>> kks) {
          views::join;
 }
 
-const bool BLOWUP = true;
+const bool USE_STDIN = true;
+const bool CHECK_CONJ_1 = false;
+const bool CHECK_CONJ_2 = true;
 
 int main() {
   printf("Starting.\n");
   srand(time(NULL));
-  if (!BLOWUP)
+  if (CHECK_CONJ_1) {
+    printf("Checking conjecture for cyclic edge-nbh 3-conn\n");
+    find_example(graph6_reader_iterable(std::cin), breaks_conj_edge_nbh_1);
+  } else if (CHECK_CONJ_2) {
+    printf("Checking conjecture for cyclic edge-nbh 4-conn\n");
+    find_example(graph6_reader_iterable(std::cin), breaks_conj_edge_nbh_2);
+  } else if (USE_STDIN)
     check_all(graph6_reader_iterable(std::cin));
-  else
-    check_all(reg_blowup_generator(graph6_reader_iterable(std::cin).to_view(),
-                                   {{1}, {4}, {5}, {6}}));
+  // else
+  //   check_all(reg_blowup_generator(graph6_reader_iterable(std::cin).to_view(),
+  //                                  {{5}, {4, 5}, {5, 5}}));
 }

@@ -76,6 +76,8 @@ struct graph {
   bool is_acyclic() const;
   // Does the neighborhood of u induce an acyclic graph?
   bool has_acyclic_neighborhood(int u) const;
+  bool has_cyclic_vx_neighborhood() const;
+  bool has_cyclic_edge_neighborhood() const;
   // Is there any acyclic cut? Empty if not, or if already is disconnected.
   vector<int> forest_cut() const;
   vector<int> non_trivial_forest_cut() const;

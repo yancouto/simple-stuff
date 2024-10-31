@@ -87,7 +87,7 @@ struct graph6_reader_iterable
     return graph6_reader_iterator(std::istream_iterator<unsigned char>(infile));
   }
   graph6_reader_iterator end() { return graph6_reader_iterator(); }
-  auto to_view() {
+  /*auto to_view() {
     auto it = begin();
     auto last = end();
     return views::repeat(0) | views::transform([=](int) mutable {
@@ -96,7 +96,7 @@ struct graph6_reader_iterable
              ++it;
              return g;
            });
-  }
+  }*/
 };
 
 vector<graph> graph::from_file(const string& filename, Format format) {
@@ -400,13 +400,35 @@ bool graph::is_4_connected() const {
   return true;
 }
 
+void deb(const vector<int>& v) {
+  for (int x : v) printf("%d ", x + 1);
+  printf("\n");
+}
+
 vector<int> graph::neighborhood(const vector<int>& vxs) const {
+  assert(std::ranges::is_sorted(vxs));
   vector<int> all, ans;
   for (int u : vxs) all.insert(all.end(), adj[u].begin(), adj[u].end());
-  std::sort(all.begin(), all.end());
-  std::set_difference(all.begin(), all.end(), vxs.begin(), vxs.end(),
-                      std::back_inserter(ans));
+  std::ranges::sort(all);
+  auto dup = std::ranges::unique(all);
+  all.erase(dup.begin(), dup.end());
+  std::ranges::set_difference(all, vxs, std::back_inserter(ans));
   return ans;
+}
+
+bool graph::has_cyclic_vx_neighborhood() const {
+  for (int u : vertices())
+    if (has_acyclic_neighborhood(u)) return false;
+  return true;
+}
+bool graph::has_cyclic_edge_neighborhood() const {
+  for (int u : vertices())
+    for (int v : adj[u]) {
+      if (u < v) break;
+      auto nbh = neighborhood({v, u});
+      if (induced_subgraph(nbh).is_acyclic()) return false;
+    }
+  return true;
 }
 
 // A forest cut removing each vertex
