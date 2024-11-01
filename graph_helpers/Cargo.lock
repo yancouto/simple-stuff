@@ -33,8 +33,8 @@ name = "graph_helpers"
 version = "0.1.0"
 dependencies = [
  "genpet",
- "graph6-rs",
  "petgraph",
+ "sorted-vec",
 ]
 
 [[package]]
@@ -62,3 +62,9 @@ dependencies = [
  "fixedbitset",
  "indexmap",
 ]
+
+[[package]]
+name = "sorted-vec"
+version = "0.8.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f64b077cc81ab5f1209bb44c6530a3277261aeaa5405111d48326897306918b"
