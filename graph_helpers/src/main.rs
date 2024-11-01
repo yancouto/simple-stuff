@@ -1,3 +1,4 @@
+#![feature(iterator_try_collect)]
 use genpet::GengOption;
 
 mod graph_ext;

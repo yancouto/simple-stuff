@@ -33,7 +33,6 @@ name = "graph_helpers"
 version = "0.1.0"
 dependencies = [
  "genpet",
- "petgraph",
  "sorted-vec",
 ]
 
