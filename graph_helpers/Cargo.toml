@@ -5,4 +5,5 @@ edition = "2021"
 
 [dependencies]
 genpet = { path = "genpet" }
+itertools = "0.13.0"
 sorted-vec = "0.8"

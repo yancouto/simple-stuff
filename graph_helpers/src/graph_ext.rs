@@ -1,3 +1,4 @@
+use itertools::Either;
 use sorted_vec::SortedSet;
 
 // SMALL_GRAPHS
@@ -20,8 +21,12 @@ impl Graph {
     pub fn vertices(&self) -> impl Iterator<Item = Idx> {
         self.vertices_from(0)
     }
-    pub fn adj(&self, u: usize) -> &NodeSet {
-        &self.adj[u]
+    #[inline]
+    pub fn adj(&self, u: Idx) -> &NodeSet {
+        &self.adj[u as usize]
+    }
+    pub fn degree(&self, u: Idx) -> usize {
+        self.adj(u).len()
     }
     pub fn min_degree(&self) -> usize {
         self.adj.iter().map(|neigh| neigh.len()).min().unwrap_or(0)
@@ -32,14 +37,21 @@ impl Graph {
     pub fn induced(&self, nodes: &NodeSet) -> Self {
         let adj = nodes
             .iter()
+            .copied()
             .map(|u| {
-                self.adj(*u as usize)
-                    .iter()
-                    .filter(|v| nodes.binary_search(v).is_ok())
-                    .copied()
-                    .collect::<Vec<_>>()
-                    .try_into()
-                    .unwrap()
+                let vxs = if nodes.len() > self.degree(u) {
+                    Either::Left(self.adj(u).iter().map(|u| (*u, false, true)))
+                } else {
+                    Either::Right(nodes.iter().map(|u| (*u, true, false)))
+                };
+                vxs.filter_map(|(v, in_nodes, in_adj)| {
+                    ((in_nodes || nodes.binary_search(&v).is_ok())
+                        && (in_adj || self.adj(u).binary_search(&v).is_ok()))
+                    .then_some(v)
+                })
+                .collect::<Vec<_>>()
+                .try_into()
+                .unwrap()
             })
             .collect();
 
@@ -54,7 +66,7 @@ impl Graph {
     }
     pub fn print_edges(&self) {
         for u in self.vertices() {
-            for v in self.adj(u as usize).iter().copied() {
+            for v in self.adj(u).iter().copied() {
                 if v > u {
                     println!("{} {}", self.pretty(u), self.pretty(v));
                 }
