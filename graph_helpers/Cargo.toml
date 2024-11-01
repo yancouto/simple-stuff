@@ -1,0 +1,9 @@
+[package]
+name = "graph_helpers"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+graph6-rs = "0.1.8"
+petgraph = "0.6"
+genpet = { path = "genpet" }
