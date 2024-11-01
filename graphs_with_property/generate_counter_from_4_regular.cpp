@@ -142,7 +142,7 @@ bool breaks_conj_edge_nbh_1(const graph &g) {
 }
 
 // G 4-conn, n >= 7, cycles in all vx and edge nbh => m >= 9n / 4
-// Found counters with n=7..8, no counter n=9..12
+// Found counters with n=7..8, no counter n=9..13
 bool breaks_conj_edge_nbh_2(const graph &g) {
   int n = g.vertex_count();
   if (n < 7) return false;
