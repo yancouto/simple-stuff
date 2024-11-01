@@ -1,0 +1,3 @@
+[submodule "graph_helpers/genpet"]
+	path = graph_helpers/genpet
+	url = https://github.com/ericbrandwein/genpet
