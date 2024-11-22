@@ -126,7 +126,7 @@ void check_all(auto graphs) {
   if (!any) printf(" No counterexample found.\n");
 }
 
-// G 3-conn, n >= 6, cycles in all vx and edge nbh => m >= 9n / 4
+// G 3-conn 2-cyclic, n >= 6 => m >= 9n / 4
 // Found counter with n=9, no counter n=10..12
 bool breaks_conj_edge_nbh_1(const graph &g) {
   int n = g.vertex_count();
@@ -135,24 +135,24 @@ bool breaks_conj_edge_nbh_1(const graph &g) {
     printf("Please only use graphs with m < 9n / 4\n");
     return false;
   }
-  if (!g.has_cyclic_vx_neighborhood()) return false;
+  if (!g.is_1_cyclic()) return false;
   if (!g.is_3_connected()) return false;
-  if (!g.has_cyclic_edge_neighborhood()) return false;
+  if (!g.is_2_cyclic()) return false;
   return true;
 }
 
-// G 4-conn, n >= 7, cycles in all vx and edge nbh => m >= 9n / 4
+// G 4-conn 2-cyclic, n >= 7 => m >= 7n / 3
 // Found counters with n=7..8, no counter n=9..13
 bool breaks_conj_edge_nbh_2(const graph &g) {
   int n = g.vertex_count();
   if (n < 7) return false;
   if (g.edge_count() * 3 >= 7 * n) {
-    printf("Please only use graphs with m < 9n / 4\n");
+    printf("Please only use graphs with m < 7n / 3\n");
     return false;
   }
-  if (!g.has_cyclic_vx_neighborhood()) return false;
+  if (!g.is_1_cyclic()) return false;
   if (!g.is_4_connected()) return false;
-  if (!g.has_cyclic_edge_neighborhood()) return false;
+  if (!g.is_2_cyclic()) return false;
   return true;
 }
 
@@ -166,10 +166,12 @@ void find_example(auto graphs, auto condition) {
     tot++;
     if (log_exp.should_log())
       printf("Testing graph %d (n=%d m=%d) after %.1fs...\n", tot, n,
-             g.edge_count(), total_time.peek()) if (condition(g)) {
-        printf(">>>>> Found example\n");
-        g.print_debug(true);
-      }
+             g.edge_count(), total_time.peek());
+    if (condition(g)) {
+      printf(">>>>> Found example n = %d m = %d\n", g.vertex_count(),
+             g.edge_count());
+      g.print_debug(true);
+    }
   }
 }
 
@@ -252,10 +254,14 @@ int main() {
   printf("Starting.\n");
   srand(time(NULL));
   if (CHECK_CONJ_1) {
-    printf("Checking conjecture for cyclic edge-nbh 3-conn\n");
+    // Run with a command like this, replace the n value and keep the rest.
+    // > n=6; m=$(((9*n-1)/4)); ./nauty2_8_9/geng.exe -C $n $m:$m
+    printf("Checking conjecture for 2-cyclic 3-conn\n");
     find_example(graph6_reader_iterable(std::cin), breaks_conj_edge_nbh_1);
   } else if (CHECK_CONJ_2) {
-    printf("Checking conjecture for cyclic edge-nbh 4-conn\n");
+    // Run with a command like this, replace the n value and keep the rest.
+    // > n=7; m=$(((7*n-1)/3)); ./nauty2_8_9/geng.exe -C $n $m:$m
+    printf("Checking conjecture for 2-cyclic 4-conn\n");
     find_example(graph6_reader_iterable(std::cin), breaks_conj_edge_nbh_2);
   } else if (USE_STDIN)
     check_all(graph6_reader_iterable(std::cin));

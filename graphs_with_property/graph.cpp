@@ -416,17 +416,20 @@ vector<int> graph::neighborhood(const vector<int>& vxs) const {
   return ans;
 }
 
-bool graph::has_cyclic_vx_neighborhood() const {
+bool graph::is_1_cyclic() const {
   for (int u : vertices())
-    if (has_acyclic_neighborhood(u)) return false;
+    if (degree(u) < vertex_count() - 1 && has_acyclic_neighborhood(u))
+      return false;
   return true;
 }
-bool graph::has_cyclic_edge_neighborhood() const {
+// Assumes it is already 1-cyclic, check using is_1_cyclic first.
+bool graph::is_2_cyclic() const {
   for (int u : vertices())
     for (int v : adj[u]) {
       if (u < v) break;
       auto nbh = neighborhood({v, u});
-      if (induced_subgraph(nbh).is_acyclic()) return false;
+      if (nbh.size() < vertex_count() - 2 && induced_subgraph(nbh).is_acyclic())
+        return false;
     }
   return true;
 }
