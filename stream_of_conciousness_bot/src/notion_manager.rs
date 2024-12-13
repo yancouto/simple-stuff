@@ -1,7 +1,4 @@
-use std::{
-    collections::{btree_map::Entry, BTreeMap, BTreeSet},
-    usize,
-};
+use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
 use anyhow::Context;
 use chrono::{NaiveDate, NaiveTime};
@@ -69,6 +66,7 @@ pub struct NotionCommand {
 }
 
 impl NotionCommand {
+    #[allow(clippy::result_large_err)]
     pub fn try_merge(maybe_self: Option<Self>, other: Self) -> Result<Self, (Self, Self)> {
         use InnerCommand::*;
         use NotionCommand as C;
@@ -284,8 +282,7 @@ impl NotionManagerForUser {
                                 }],
                             },
                     };
-                    let page = self
-                        .api
+                    self.api
                         .pages
                         .create_a_page(
                             CreateAPageRequestBuilder::default()
@@ -298,8 +295,7 @@ impl NotionManagerForUser {
                                 }))
                                 .build()?,
                         )
-                        .await?;
-                    page
+                        .await?
                 };
                 vacant_entry.insert(id)
             }
@@ -411,7 +407,7 @@ impl NotionManagerForUser {
         log::trace!("Adding text to Notion: {:?}", all_text);
         let id = self.get_or_create_page(date).await?.id.clone();
         let blocks = all_text
-            .into_iter()
+            .iter()
             .map(|(text, time)| Block {
                 block_type: BlockType::Paragraph {
                     paragraph: ParagraphValue {

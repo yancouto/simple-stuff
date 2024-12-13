@@ -19,7 +19,7 @@ pub enum Command {
 
 impl Command {
     pub fn parse_or_text(text: String) -> Self {
-        Self::parse(&text, "").unwrap_or_else(|_| Self::Text(text))
+        Self::parse(&text, "").unwrap_or(Self::Text(text))
     }
 
     /// Multiple fixes to the date. First, considers the correct timezone.
