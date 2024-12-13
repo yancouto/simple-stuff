@@ -1,7 +1,7 @@
 use teloxide::{
     prelude::*,
     requests::HasPayload,
-    types::{AllowedUpdate, MediaKind, MediaText, MessageCommon, MessageKind, UpdateKind},
+    types::{AllowedUpdate, MediaKind, MediaText, MessageCommon, MessageKind, UpdateKind, User},
     utils::command::BotCommands,
 };
 
@@ -49,10 +49,17 @@ pub async fn poll_once_and_update_notion() -> anyhow::Result<()> {
                             media_kind: MediaKind::Text(MediaText { text, .. }),
                             ..
                         }),
+                    from:
+                        Some(User {
+                            username: Some(username),
+                            ..
+                        }),
                     ..
                 }) = update.kind
                 {
-                    Some((Command::parse_or_text(text), date))
+                    notion
+                        .user_is_known(&username)
+                        .then(|| (Command::parse_or_text(text), username, date))
                 } else {
                     log::info!("Not a text message: {:?}", update);
                     None
@@ -62,7 +69,13 @@ pub async fn poll_once_and_update_notion() -> anyhow::Result<()> {
 
         if !any_update && !cmds.is_empty() {
             // Let's fail fast if we can't talk to Notion at all.
-            notion.check_can_access_database().await?;
+            notion
+                .check_can_access_database(
+                    cmds.iter()
+                        .map(|(_, username, _)| username.as_str())
+                        .collect(),
+                )
+                .await?;
             any_update = true;
         }
         let (suc, tot) = Command::handle(&bot, cmds, &mut notion).await?;

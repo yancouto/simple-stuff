@@ -1,7 +1,7 @@
 use chrono::{DateTime, NaiveDate, NaiveTime, Timelike, Utc};
 use teloxide::{utils::command::BotCommands, Bot};
 
-use crate::notion_manager::{NotionCommand, NotionManager, HOUR_CUT_TO_NEXT_DAY};
+use crate::notion_manager::{InnerCommand, NotionCommand, NotionManager, HOUR_CUT_TO_NEXT_DAY};
 
 #[derive(BotCommands, Clone, Debug)]
 #[command(
@@ -39,21 +39,25 @@ impl Command {
 
     pub async fn handle(
         _bot: &Bot,
-        cmds: Vec<(Command, DateTime<Utc>)>,
+        cmds: Vec<(Command, String, DateTime<Utc>)>,
         notion: &mut NotionManager,
     ) -> anyhow::Result<(usize, usize)> {
         let mut success = 0;
         let mut total = 0;
         let mut pending_cmd = None;
-        for (cmd, date) in cmds {
+        for (cmd, username, date) in cmds {
             let (date, time) = Self::fix_date(date);
-            let new_cmd = match cmd {
-                Self::Mood(mood) => NotionCommand::Mood(mood, date),
-                Self::Text(text) => NotionCommand::Text(vec![(text, time)], date),
-                Self::Person(person) => NotionCommand::People(
-                    person.split(',').map(|s| s.trim().to_string()).collect(),
-                    date,
-                ),
+            let inner = match cmd {
+                Self::Mood(mood) => InnerCommand::Mood(mood),
+                Self::Text(text) => InnerCommand::Text(vec![(text, time)]),
+                Self::Person(person) => {
+                    InnerCommand::People(person.split(',').map(|s| s.trim().to_string()).collect())
+                }
+            };
+            let new_cmd = NotionCommand {
+                inner,
+                username,
+                date,
             };
             match NotionCommand::try_merge(pending_cmd.take(), new_cmd) {
                 Ok(cmd) => pending_cmd = Some(cmd),

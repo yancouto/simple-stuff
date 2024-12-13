@@ -170,3 +170,4 @@ pip-log.txt
 *.class
 node_modules
 package-lock.json
+graphs_with_property/.vscode/settings.json
