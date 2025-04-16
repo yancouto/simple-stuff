@@ -1,0 +1,53 @@
+Analysis of the Hamilton Drinking Game variants.
+"self-self": How many times a song says its own name
+"other-self": How many times a song says another songs name.
+"self-other": How many times a songs name is said in another song.
+
+Alexander Hamilton                       : self-self   7 other-self   1 self-other  13
+Aaron Burr, Sir                          : self-self   1 other-self   1 self-other   3
+My Shot                                  : self-self  24 other-self   0 self-other  11
+The Story of Tonight                     : self-self   7 other-self   0 self-other   0
+The Schuyler Sisters                     : self-self   2 other-self   0 self-other   2
+Farmer Refuted                           : self-self   0 other-self   0 self-other   0
+You’ll Be Back                           : self-self   3 other-self   0 self-other   0
+Right Hand Man                           : self-self   1 other-self   4 self-other   5
+A Winter’s Ball                          : self-self   1 other-self   1 self-other   0
+Helpless                                 : self-self  22 other-self   0 self-other  10
+Satisfied                                : self-self  24 other-self   5 self-other  11
+The Story of Tonight (Reprise)           : self-self   1 other-self   0 self-other   0
+Wait For It                              : self-self  35 other-self   0 self-other  16
+Stay Alive                               : self-self   4 other-self   0 self-other   2
+Ten Duel Commandments                    : self-self   2 other-self   1 self-other   0
+Meet Me Inside                           : self-self   1 other-self   1 self-other   0
+That Would Be Enough                     : self-self   4 other-self   2 self-other   5
+Guns and Ships                           : self-self   1 other-self   8 self-other   0
+History Has Its Eyes on You              : self-self   1 other-self   1 self-other   3
+Yorktown (The World Turned Upside Down)  : self-self   7 other-self   5 self-other   1
+What Comes Next?                         : self-self   1 other-self   0 self-other   0
+Dear Theodosia                           : self-self   1 other-self   4 self-other   0
+Non-Stop                                 : self-self   8 other-self  22 self-other   0
+What’d I Miss                            : self-self   5 other-self   1 self-other   0
+Cabinet Battle #1                        : self-self   0 other-self   1 self-other   0
+Take a Break                             : self-self   7 other-self   1 self-other   1
+Say No to This                           : self-self  24 other-self   5 self-other   0
+The Room Where It Happens                : self-self  26 other-self   5 self-other   4
+Schuyler Defeated                        : self-self   0 other-self   0 self-other   0
+Cabinet Battle #2                        : self-self   0 other-self   1 self-other   0
+Washington On Your Side                  : self-self   6 other-self   0 self-other   0
+One Last Time                            : self-self   9 other-self   2 self-other   0
+I Know Him                               : self-self   1 other-self   0 self-other   0
+The Adams Administration                 : self-self   1 other-self   1 self-other   0
+We Know                                  : self-self   2 other-self   0 self-other   5
+Hurricane                                : self-self   4 other-self  14 self-other   1
+The Reynolds Pamphlet                    : self-self   2 other-self   3 self-other   1
+Burn                                     : self-self   7 other-self   0 self-other   1
+Blow Us All Away                         : self-self   2 other-self   0 self-other   4
+Stay Alive (Reprise)                     : self-self   6 other-self   0 self-other   2
+It’s Quiet Uptown                        : self-self   4 other-self   3 self-other   2
+The Election of 1800                     : self-self   1 other-self   5 self-other   0
+Your Obedient Servant                    : self-self   3 other-self   4 self-other   0
+Best of Wives and Best of Women          : self-self   1 other-self   1 self-other   0
+The World Was Wide Enough                : self-self   2 other-self   1 self-other   0
+Who Lives, Who Dies, Who Tells Your Story: self-self   1 other-self   0 self-other   1
+
+Total                                    : self-self 272 other-self 104 self-other 104
