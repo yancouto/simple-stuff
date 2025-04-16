@@ -1,5 +1,6 @@
 import json
 import re
+import sys
 
 print(
     """Analysis of the Hamilton Drinking Game variants.
@@ -49,6 +50,7 @@ for i in range(len(titles)):
 self_self_total = 0
 other_self_total = 0
 self_other_total = sum(self_other_count)
+every_3 = "--every-3" in sys.argv
 
 for self_other, track in zip(self_other_count, data["tracks"]):
     title: str = track["song"]["title"]
@@ -58,6 +60,8 @@ for self_other, track in zip(self_other_count, data["tracks"]):
     other_self = sum(
         lyrics.count(s) for sts in titles for s in sts if sts != search_terms
     )
+    if every_3 and self_self > 10:
+        self_self //= 3
     print(
         f"{title.ljust(longest_title)}: self-self {self_self:3} other-self {other_self:3} self-other {self_other:3}"
     )
