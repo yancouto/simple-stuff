@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interval Graph Visualizer</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Interval Graph Visualizer</h1>
+            <p>Create intervals on the timeline and see the corresponding graph where edges connect intersecting intervals</p>
+        </header>
+
+        <div class="main-content">
+            <!-- Graph Visualization Section -->
+            <section class="graph-section">
+                <div class="section-header">
+                    <h2>Interval Graph</h2>
+                    <div class="info">
+                        <span id="nodeCount">Nodes: 0</span>
+                        <span id="edgeCount">Edges: 0</span>
+                        <button id="resetLayoutBtn" class="btn btn-small">Reset Layout</button>
+                    </div>
+                </div>
+                <div class="workspace-selector">
+                    <span class="workspace-label">Workspace:</span>
+                    <button class="workspace-btn active" data-workspace="1">1</button>
+                    <button class="workspace-btn" data-workspace="2">2</button>
+                    <button class="workspace-btn" data-workspace="3">3</button>
+                    <button class="workspace-btn" data-workspace="4">4</button>
+                    <button class="workspace-btn" data-workspace="5">5</button>
+                </div>
+                <div class="graph-container">
+                    <svg id="graphSvg"></svg>
+                </div>
+            </section>
+
+            <!-- Interval Timeline Section -->
+            <section class="timeline-section">
+                <div class="section-header">
+                    <h2>Interval Timeline</h2>
+                    <div class="controls">
+                        <button id="addIntervalBtn" class="btn btn-primary">+ Add Interval</button>
+                        <button id="clearAllBtn" class="btn btn-secondary">Clear All</button>
+                        <button id="exportBtn" class="btn btn-secondary">Export</button>
+                        <button id="importBtn" class="btn btn-secondary">Import</button>
+                    </div>
+                </div>
+                <div class="timeline-container">
+                    <canvas id="timelineCanvas"></canvas>
+                    <div id="timelineAxis">Click and drag on the timeline to create intervals</div>
+                    <div id="tooltip" class="tooltip"></div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Interval List -->
+        <section class="interval-list-section">
+            <div class="section-header">
+                <h3>Intervals</h3>
+                <div class="stats" id="intervalStats"></div>
+            </div>
+            <div id="intervalList" class="interval-list">
+                <div class="empty-state">
+                    <p>🎨 <strong>Get Started!</strong></p>
+                    <p>Click and drag on the timeline above to create your first interval.</p>
+                    <div class="example-buttons">
+                        <button id="loadExample1" class="btn btn-small btn-secondary">Load Example 1</button>
+                        <button id="loadExample2" class="btn btn-small btn-secondary">Load Example 2</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Modal for adding/editing intervals -->
+    <div id="intervalModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="modalTitle">Add Interval</h2>
+            <form id="intervalForm">
+                <div class="form-group">
+                    <label for="intervalName">Name:</label>
+                    <input type="text" id="intervalName" required placeholder="e.g., A, B, Task1">
+                    <span class="error-message" id="nameError"></span>
+                </div>
+                <div class="form-group">
+                    <label for="intervalStart">Start:</label>
+                    <input type="number" id="intervalStart" required step="0.1" min="0" max="100" value="10">
+                    <span class="error-message" id="startError"></span>
+                </div>
+                <div class="form-group">
+                    <label for="intervalEnd">End:</label>
+                    <input type="number" id="intervalEnd" required step="0.1" min="0" max="100" value="30">
+                    <span class="error-message" id="endError"></span>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Save <span class="shortcut-hint">Enter</span></button>
+                    <button type="button" id="cancelBtn" class="btn btn-secondary">Cancel <span class="shortcut-hint">Esc</span></button>
+                    <button type="button" id="duplicateBtn" class="btn btn-secondary" style="display: none;">Duplicate</button>
+                    <button type="button" id="deleteModalBtn" class="btn btn-danger" style="display: none;">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
