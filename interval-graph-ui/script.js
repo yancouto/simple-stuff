@@ -595,7 +595,9 @@ class IntervalGraphVisualizer {
             if (!this.hasMoved && Math.abs(pos.x - this.mouseDownPos.x) < MOVE_THRESHOLD) return;
             this.hasMoved = true;
             const value = this.xToValue(pos.x);
-            this.activeInterval.start = Math.round(Math.max(0, Math.min(value, this.activeInterval.end - 1)) * 10) / 10;
+            // Clamp: must stay in [0, end-1], rounded to 1 decimal place
+            const newStart = Math.max(0, Math.min(value, this.activeInterval.end - 1));
+            this.activeInterval.start = Math.round(newStart * 10) / 10;
             this.timelineCanvas.style.cursor = 'ew-resize';
             this.draw();
             return;
@@ -605,7 +607,9 @@ class IntervalGraphVisualizer {
             if (!this.hasMoved && Math.abs(pos.x - this.mouseDownPos.x) < MOVE_THRESHOLD) return;
             this.hasMoved = true;
             const value = this.xToValue(pos.x);
-            this.activeInterval.end = Math.round(Math.min(100, Math.max(value, this.activeInterval.start + 1)) * 10) / 10;
+            // Clamp: must stay in [start+1, 100], rounded to 1 decimal place
+            const newEnd = Math.min(100, Math.max(value, this.activeInterval.start + 1));
+            this.activeInterval.end = Math.round(newEnd * 10) / 10;
             this.timelineCanvas.style.cursor = 'ew-resize';
             this.draw();
             return;
