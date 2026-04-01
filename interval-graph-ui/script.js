@@ -119,8 +119,13 @@ class IntervalGraphVisualizer {
             }
         });
         
+        // Track mousedown to prevent closing when dragging from inside to outside
+        let mouseDownTarget = null;
+        window.addEventListener('mousedown', (e) => {
+            mouseDownTarget = e.target;
+        });
         window.addEventListener('click', (e) => {
-            if (e.target === modal) this.closeModal();
+            if (e.target === modal && mouseDownTarget === modal) this.closeModal();
         });
         
         document.getElementById('intervalForm').addEventListener('submit', (e) => {

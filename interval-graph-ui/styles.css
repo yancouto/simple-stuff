@@ -59,6 +59,7 @@ header p {
 .controls {
     display: flex;
     gap: 10px;
+    margin-left: 16px;
 }
 
 .info {

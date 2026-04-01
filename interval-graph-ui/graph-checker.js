@@ -406,7 +406,9 @@ class GraphCheckerApp {
     }
 
     deleteNode(id) {
+        console.log('deleteNode called with id:', id);
         this.nodes = this.nodes.filter(n => n.id !== id);
+        console.log('Nodes after delete:', this.nodes.length);
         this.edges = this.edges.filter(e => e.source !== id && e.target !== id);
         if (this.edgeStartId === id) this.edgeStartId = null;
         this.render();
@@ -452,6 +454,7 @@ class GraphCheckerApp {
     // ── Rendering ─────────────────────────────────────────────
 
     render() {
+        console.log('=== RENDER CALLED === renderCount:', ++this.renderCount);
         const svg = this.svg;
         svg.selectAll('*').remove();
 
@@ -484,7 +487,18 @@ class GraphCheckerApp {
             .attr('stroke-width', d => this.hoverEdgeId === d.id ? 5 : 2.5)
             .attr('stroke-opacity', 0.85)
             .style('cursor', this.tool === 'delete' ? 'pointer' : 'default')
-            .on('click', (event, d) => { event.stopPropagation(); this.deleteEdge(d.id); })
+            .on('mousedown', (event, d) => {
+                if (this.tool === 'delete') {
+                    this.edgeToDelete = d.id;
+                }
+            })
+            .on('mouseup', (event, d) => {
+                if (this.tool === 'delete' && this.edgeToDelete === d.id) {
+                    event.stopPropagation(); 
+                    this.deleteEdge(d.id);
+                    this.edgeToDelete = null;
+                }
+            })
             .on('mouseenter', (event, d) => {
                 if (this.tool !== 'delete') return;
                 this.hoverEdgeId = d.id; this.render();
@@ -495,15 +509,15 @@ class GraphCheckerApp {
         const dragBehavior = d3.drag()
             .on('start', (event, d) => {
                 this.wasDragged = false;
-                this.dragStartPos = { x: event.x, y: event.y };
+                this.dragStartNode = { x: d.x, y: d.y };
                 event.sourceEvent.stopPropagation();
             })
             .on('drag', (event, d) => {
-                const dx = event.x - this.dragStartPos.x;
-                const dy = event.y - this.dragStartPos.y;
-                if (Math.sqrt(dx * dx + dy * dy) > 5) this.wasDragged = true;
-                d.x = Math.max(25, Math.min(this.svgWidth - 25, event.x));
-                d.y = Math.max(25, Math.min(this.svgHeight - 25, event.y));
+                if (Math.abs(event.dx) > 0.1 || Math.abs(event.dy) > 0.1) this.wasDragged = true;
+                // Get pointer position in SVG coordinates
+                const [pointerX, pointerY] = d3.pointer(event.sourceEvent, this.svgEl);
+                d.x = Math.max(25, Math.min(this.svgWidth - 25, pointerX));
+                d.y = Math.max(25, Math.min(this.svgHeight - 25, pointerY));
                 this.render();
             })
             .on('end', (event, d) => {
@@ -516,9 +530,13 @@ class GraphCheckerApp {
             .data(this.nodes)
             .join('g')
             .attr('transform', d => `translate(${d.x},${d.y})`)
-            .style('cursor', this.tool === 'delete' ? 'pointer' : 'grab')
-            .call(dragBehavior);
-
+            .style('cursor', this.tool === 'delete' ? 'pointer' : 'grab');
+        
+        // Only attach drag behavior when not in delete mode
+        if (this.tool !== 'delete') {
+            nodeEl.call(dragBehavior);
+        }
+        
         // Circle
         nodeEl.append('circle')
             .attr('r', 22)
@@ -530,8 +548,34 @@ class GraphCheckerApp {
             })
             .attr('stroke-width', d =>
                 d.id === this.edgeStartId || (this.tool === 'delete' && d.id === this.hoverNodeId) ? 4 : 2.5
-            );
-
+            )
+            .on('mousedown', (event, d) => {
+                console.log('CIRCLE MOUSEDOWN - tool:', this.tool, 'id:', d.id);
+                if (this.tool === 'delete') {
+                    // Store the node ID to delete on mouseup
+                    this.nodeToDelete = d.id;
+                    console.log('Set nodeToDelete to:', this.nodeToDelete);
+                } else if (this.tool === 'addEdge') {
+                    // For edge mode, let normal click handling work
+                    this.nodeToClick = d;
+                }
+            })
+            .on('mouseup', (event, d) => {
+                console.log('CIRCLE MOUSEUP - tool:', this.tool, 'id:', d.id, 'nodeToDelete:', this.nodeToDelete);
+                if (this.tool === 'delete' && this.nodeToDelete === d.id) {
+                    // Only delete if mouseup is on the same node as mousedown
+                    console.log('DELETING NODE:', d.id);
+                    event.stopPropagation();
+                    this.deleteNode(d.id);
+                    this.nodeToDelete = null;
+                } else if (this.tool === 'addEdge' && this.nodeToClick && this.nodeToClick.id === d.id) {
+                    this.handleNodeClick(d);
+                    this.nodeToClick = null;
+                } else {
+                    console.log('NOT DELETING - mismatch or wrong tool');
+                }
+            });
+        
         // Label
         nodeEl.append('text')
             .attr('text-anchor', 'middle')
@@ -544,10 +588,14 @@ class GraphCheckerApp {
 
         // Hover for delete-mode highlight
         nodeEl.on('mouseenter', (event, d) => {
+            console.log('NODE MOUSEENTER - id:', d.id, 'tool:', this.tool);
             if (this.tool !== 'delete') return;
             this.hoverNodeId = d.id; this.render();
         })
-        .on('mouseleave', () => { this.hoverNodeId = null; this.render(); });
+        .on('mouseleave', () => { 
+            console.log('NODE MOUSELEAVE');
+            this.hoverNodeId = null; this.render(); 
+        });
 
         // Placeholder text when empty
         if (this.nodes.length === 0) {
