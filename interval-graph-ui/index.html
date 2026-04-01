@@ -12,17 +12,19 @@
         <header>
             <h1>Interval Graph Visualizer</h1>
             <p>Create intervals on the timeline and see the corresponding graph where edges connect intersecting intervals</p>
+            <a href="graph-checker.html" class="header-link">Graph → Interval Checker →</a>
         </header>
 
         <div class="main-content">
             <!-- Graph Visualization Section -->
-            <section class="graph-section">
+            <section class="graph-section" id="graphSection">
                 <div class="section-header">
                     <h2>Interval Graph</h2>
                     <div class="info">
                         <span id="nodeCount">Nodes: 0</span>
                         <span id="edgeCount">Edges: 0</span>
                         <button id="resetLayoutBtn" class="btn btn-small">Reset Layout</button>
+                        <button id="graphFullscreenBtn" class="btn btn-icon fullscreen-btn" title="Fullscreen">⛶</button>
                     </div>
                 </div>
                 <div class="workspace-selector">
@@ -39,7 +41,7 @@
             </section>
 
             <!-- Interval Timeline Section -->
-            <section class="timeline-section">
+            <section class="timeline-section" id="timelineSection">
                 <div class="section-header">
                     <h2>Interval Timeline</h2>
                     <div class="controls">
@@ -47,6 +49,7 @@
                         <button id="clearAllBtn" class="btn btn-secondary">Clear All</button>
                         <button id="exportBtn" class="btn btn-secondary">Export</button>
                         <button id="importBtn" class="btn btn-secondary">Import</button>
+                        <button id="timelineFullscreenBtn" class="btn btn-icon fullscreen-btn" title="Fullscreen">⛶</button>
                     </div>
                 </div>
                 <div class="timeline-container">
