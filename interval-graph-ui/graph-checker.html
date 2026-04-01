@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interval Graph Checker</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Interval Graph Checker</h1>
+            <p>Draw any graph and find out if it is an interval graph — and if so, see its interval representation</p>
+            <a href="index.html" class="header-link">← Back to Interval Creator</a>
+        </header>
+
+        <div class="checker-layout">
+            <!-- Graph Editor -->
+            <section class="checker-section" id="graphEditorSection">
+                <div class="section-header">
+                    <h2>Draw Graph</h2>
+                    <div class="tool-group">
+                        <button class="tool-btn active" data-tool="addNode" title="Click empty space to add a node">🔵 Node</button>
+                        <button class="tool-btn" data-tool="addEdge" title="Click two nodes to connect them">🔗 Edge</button>
+                        <button class="tool-btn" data-tool="delete" title="Click a node or edge to delete it">🗑 Delete</button>
+                    </div>
+                    <div class="controls">
+                        <button class="btn btn-secondary btn-small" id="clearGraphBtn">Clear</button>
+                        <button class="btn btn-secondary btn-small" id="exampleIntervalBtn">Example: Interval</button>
+                        <button class="btn btn-secondary btn-small" id="exampleNonIntervalBtn">Example: Non-Interval</button>
+                        <button class="btn btn-icon fullscreen-btn" id="graphEditorFullscreenBtn" title="Fullscreen">⛶</button>
+                    </div>
+                </div>
+                <div class="graph-editor-container">
+                    <svg id="graphEditorSvg"></svg>
+                    <div class="editor-hint" id="editorHint">Click to add a node • Drag nodes to reposition</div>
+                </div>
+            </section>
+
+            <!-- Results -->
+            <section class="checker-section" id="resultsSection">
+                <div class="section-header">
+                    <h2>Analysis</h2>
+                    <button class="btn btn-icon fullscreen-btn" id="resultFullscreenBtn" title="Fullscreen">⛶</button>
+                </div>
+                <div id="resultContent" class="result-content">
+                    <div class="result-empty">Add nodes and edges to analyze the graph.</div>
+                </div>
+                <div id="intervalResultSection" style="display:none;">
+                    <div class="section-header" style="margin-top:16px;">
+                        <h3>Interval Representation</h3>
+                    </div>
+                    <canvas id="resultCanvas"></canvas>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script src="graph-checker.js"></script>
+</body>
+</html>

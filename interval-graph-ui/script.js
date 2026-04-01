@@ -13,12 +13,20 @@ class IntervalGraphVisualizer {
         this.colorIndex = 0;
         this.editingId = null;
         
-        // Mouse drag state
+        // Mouse drag state (create new interval)
         this.isDragging = false;
         this.dragStartX = null;
         this.dragCurrentX = null;
         this.previewColor = this.colors[0];
-        
+
+        // Interval interaction state (move / resize)
+        this.interactionMode = null; // null | 'create' | 'move' | 'resize-left' | 'resize-right'
+        this.activeInterval = null;
+        this.dragOffsetValue = 0;
+        this.hasMoved = false;
+        this.mouseDownPos = null;
+        this.hoveredInteraction = null; // {interval, type: 'left'|'right'|'body'}
+
         // Timeline layout
         this.intervalLevels = new Map();
         
@@ -138,7 +146,10 @@ class IntervalGraphVisualizer {
         this.timelineCanvas.addEventListener('touchstart', (e) => this.onTouchStart(e));
         this.timelineCanvas.addEventListener('touchmove', (e) => this.onTouchMove(e));
         this.timelineCanvas.addEventListener('touchend', (e) => this.onTouchEnd(e));
-        
+
+        // Fullscreen buttons
+        this.setupFullscreen();
+
         window.addEventListener('resize', () => {
             this.initCanvases();
             this.draw();
@@ -471,6 +482,14 @@ class IntervalGraphVisualizer {
     }
     
     getIntervalAtPosition(x, y) {
+        const hit = this.getIntervalInteraction(x, y);
+        return hit ? hit.interval : null;
+    }
+
+    // Returns {interval, type: 'left'|'right'|'body'} or null.
+    // 'left'/'right' = within EDGE_THRESHOLD px of an endpoint; 'body' = interior.
+    getIntervalInteraction(x, y) {
+        const EDGE_THRESHOLD = 10;
         const padding = 60;
         const lineStart = padding;
         const lineEnd = this.timelineCanvas.width - padding;
@@ -478,18 +497,21 @@ class IntervalGraphVisualizer {
         const lineY = 80;
         const intervalHeight = 25;
         const spacing = 35;
-        
+
         for (const [intervalId, level] of this.intervalLevels.entries()) {
             const interval = this.intervals.find(i => i.id === intervalId);
             if (!interval) continue;
-            
+
             const yPos = lineY + 40 + (level * spacing);
             const xStart = lineStart + (lineLength * interval.start / 100);
             const xEnd = lineStart + (lineLength * interval.end / 100);
-            
-            if (x >= xStart && x <= xEnd && y >= yPos - intervalHeight/2 && y <= yPos + intervalHeight/2) {
-                return interval;
-            }
+
+            if (y < yPos - intervalHeight / 2 || y > yPos + intervalHeight / 2) continue;
+            if (x < xStart - EDGE_THRESHOLD || x > xEnd + EDGE_THRESHOLD) continue;
+
+            if (Math.abs(x - xStart) <= EDGE_THRESHOLD) return { interval, type: 'left' };
+            if (Math.abs(x - xEnd) <= EDGE_THRESHOLD) return { interval, type: 'right' };
+            if (x >= xStart && x <= xEnd) return { interval, type: 'body' };
         }
         return null;
     }
@@ -506,25 +528,34 @@ class IntervalGraphVisualizer {
     
     onMouseDown(e) {
         // Ignore right clicks for dragging
-        if (e.button === 2) {
-            return;
-        }
-        
+        if (e.button === 2) return;
+
         const pos = this.getMousePosition(e);
-        
+        this.mouseDownPos = pos;
+        this.hasMoved = false;
+
         // Check if clicking on an existing interval
-        const clickedInterval = this.getIntervalAtPosition(pos.x, pos.y);
-        if (clickedInterval) {
-            // Don't start dragging if clicking on an interval
+        const interaction = this.getIntervalInteraction(pos.x, pos.y);
+        if (interaction) {
+            if (interaction.type === 'left') {
+                this.interactionMode = 'resize-left';
+            } else if (interaction.type === 'right') {
+                this.interactionMode = 'resize-right';
+            } else {
+                this.interactionMode = 'move';
+                this.dragOffsetValue = this.xToValue(pos.x) - interaction.interval.start;
+            }
+            this.activeInterval = interaction.interval;
             return;
         }
-        
+
         const padding = 60;
         const lineY = 80;
-        
+
         // Check if clicking in the timeline axis area to create new interval
-        if (pos.x >= padding && pos.x <= this.timelineCanvas.width - padding && 
+        if (pos.x >= padding && pos.x <= this.timelineCanvas.width - padding &&
             pos.y >= lineY - 20 && pos.y <= lineY + 20) {
+            this.interactionMode = 'create';
             this.isDragging = true;
             this.dragStartX = pos.x;
             this.dragCurrentX = pos.x;
@@ -532,37 +563,89 @@ class IntervalGraphVisualizer {
             this.timelineCanvas.style.cursor = 'crosshair';
         }
     }
-    
+
     onMouseMove(e) {
-        if (this.isDragging) {
-            const pos = this.getMousePosition(e);
+        const pos = this.getMousePosition(e);
+        const MOVE_THRESHOLD = 3;
+
+        if (this.interactionMode === 'create' && this.isDragging) {
             this.dragCurrentX = pos.x;
+            this.hasMoved = true;
             this.draw();
             this.drawDragPreview();
-        } else {
-            // Show tooltip on hover
-            const pos = this.getMousePosition(e);
-            const hoveredInterval = this.getIntervalAtPosition(pos.x, pos.y);
-            
-            if (hoveredInterval) {
-                this.showTooltip(e.clientX, e.clientY, hoveredInterval);
-                this.timelineCanvas.style.cursor = 'pointer';
+            return;
+        }
+
+        if (this.interactionMode === 'move' && this.activeInterval) {
+            if (!this.hasMoved && Math.abs(pos.x - this.mouseDownPos.x) < MOVE_THRESHOLD) return;
+            this.hasMoved = true;
+            const value = this.xToValue(pos.x);
+            const width = this.activeInterval.end - this.activeInterval.start;
+            let newStart = value - this.dragOffsetValue;
+            if (newStart < 0) newStart = 0;
+            if (newStart + width > 100) newStart = 100 - width;
+            this.activeInterval.start = Math.round(newStart * 10) / 10;
+            this.activeInterval.end = Math.round((newStart + width) * 10) / 10;
+            this.timelineCanvas.style.cursor = 'grabbing';
+            this.draw();
+            return;
+        }
+
+        if (this.interactionMode === 'resize-left' && this.activeInterval) {
+            if (!this.hasMoved && Math.abs(pos.x - this.mouseDownPos.x) < MOVE_THRESHOLD) return;
+            this.hasMoved = true;
+            const value = this.xToValue(pos.x);
+            this.activeInterval.start = Math.round(Math.max(0, Math.min(value, this.activeInterval.end - 1)) * 10) / 10;
+            this.timelineCanvas.style.cursor = 'ew-resize';
+            this.draw();
+            return;
+        }
+
+        if (this.interactionMode === 'resize-right' && this.activeInterval) {
+            if (!this.hasMoved && Math.abs(pos.x - this.mouseDownPos.x) < MOVE_THRESHOLD) return;
+            this.hasMoved = true;
+            const value = this.xToValue(pos.x);
+            this.activeInterval.end = Math.round(Math.min(100, Math.max(value, this.activeInterval.start + 1)) * 10) / 10;
+            this.timelineCanvas.style.cursor = 'ew-resize';
+            this.draw();
+            return;
+        }
+
+        // No active interaction — update cursor and tooltip based on hover
+        const interaction = this.getIntervalInteraction(pos.x, pos.y);
+        if (interaction) {
+            if (interaction.type === 'left' || interaction.type === 'right') {
+                this.timelineCanvas.style.cursor = 'ew-resize';
+                this.showTooltip(e.clientX, e.clientY, interaction.interval, 'Drag to resize');
             } else {
-                this.hideTooltip();
-                const padding = 60;
-                const lineY = 80;
-                if (pos.x >= padding && pos.x <= this.timelineCanvas.width - padding && 
-                    pos.y >= lineY - 20 && pos.y <= lineY + 20) {
-                    this.timelineCanvas.style.cursor = 'crosshair';
-                } else {
-                    this.timelineCanvas.style.cursor = 'default';
-                }
+                this.timelineCanvas.style.cursor = 'grab';
+                this.showTooltip(e.clientX, e.clientY, interaction.interval, 'Drag to move • Click to edit');
             }
+            const prev = this.hoveredInteraction;
+            if (!prev || prev.interval.id !== interaction.interval.id || prev.type !== interaction.type) {
+                this.hoveredInteraction = interaction;
+                this.draw();
+            }
+        } else {
+            const hadHover = this.hoveredInteraction !== null;
+            this.hoveredInteraction = null;
+            this.hideTooltip();
+            const padding = 60;
+            const lineY = 80;
+            if (pos.x >= padding && pos.x <= this.timelineCanvas.width - padding &&
+                pos.y >= lineY - 20 && pos.y <= lineY + 20) {
+                this.timelineCanvas.style.cursor = 'crosshair';
+            } else {
+                this.timelineCanvas.style.cursor = 'default';
+            }
+            if (hadHover) this.draw();
         }
     }
     
-    showTooltip(x, y, interval) {
-        this.tooltip.textContent = `${interval.name}: [${interval.start.toFixed(1)}, ${interval.end.toFixed(1)}] • Click to edit, Right-click to delete`;
+    showTooltip(x, y, interval, hint = null) {
+        const base = `${interval.name}: [${interval.start.toFixed(1)}, ${interval.end.toFixed(1)}]`;
+        const hintText = hint ? ` • ${hint}` : ' • Drag to move • Click to edit • Right-click to delete';
+        this.tooltip.textContent = base + hintText;
         this.tooltip.style.left = (x + 10) + 'px';
         this.tooltip.style.top = (y - 30) + 'px';
         this.tooltip.classList.add('visible');
@@ -573,36 +656,46 @@ class IntervalGraphVisualizer {
     }
     
     onMouseUp(e) {
-        const pos = this.getMousePosition(e);
-        
-        if (this.isDragging) {
+        if (this.interactionMode === 'create') {
+            this.interactionMode = null;
             this.isDragging = false;
             this.timelineCanvas.style.cursor = 'default';
-            
+
             const startValue = this.xToValue(this.dragStartX);
             const endValue = this.xToValue(this.dragCurrentX);
-            
             const minValue = Math.min(startValue, endValue);
             const maxValue = Math.max(startValue, endValue);
-            
-            // Auto-create interval if there's a meaningful range
+
             if (maxValue - minValue >= 1) {
                 this.createIntervalFromDrag(
                     Math.round(minValue * 10) / 10,
                     Math.round(maxValue * 10) / 10
                 );
             }
-            
+
             this.dragStartX = null;
             this.dragCurrentX = null;
             this.draw();
-        } else {
-            // Check if clicking on an existing interval to edit
-            const clickedInterval = this.getIntervalAtPosition(pos.x, pos.y);
-            if (clickedInterval) {
-                this.openModal(clickedInterval);
-            }
+            return;
         }
+
+        if (this.interactionMode && this.activeInterval) {
+            if (this.hasMoved) {
+                this.saveToStorage();
+                this.updateIntervalList();
+            } else {
+                // Click without drag → open edit modal
+                this.openModal(this.activeInterval);
+            }
+            this.interactionMode = null;
+            this.activeInterval = null;
+            this.hasMoved = false;
+            this.timelineCanvas.style.cursor = 'default';
+            this.draw();
+            return;
+        }
+
+        this.interactionMode = null;
     }
     
     onContextMenu(e) {
@@ -622,13 +715,25 @@ class IntervalGraphVisualizer {
     }
     
     onMouseLeave(e) {
-        if (this.isDragging) {
+        if (this.interactionMode === 'create' && this.isDragging) {
+            this.interactionMode = null;
             this.isDragging = false;
             this.timelineCanvas.style.cursor = 'default';
             this.dragStartX = null;
             this.dragCurrentX = null;
             this.draw();
+        } else if (this.interactionMode && this.activeInterval && this.hasMoved) {
+            // Save drag/resize in progress
+            this.saveToStorage();
+            this.updateIntervalList();
+            this.interactionMode = null;
+            this.activeInterval = null;
+            this.hasMoved = false;
+        } else {
+            this.interactionMode = null;
+            this.activeInterval = null;
         }
+        this.hoveredInteraction = null;
         this.hideTooltip();
     }
     
@@ -802,9 +907,42 @@ class IntervalGraphVisualizer {
         return Math.max(1, levelEndTimes.length);
     }
     
+    setupFullscreen() {
+        const toggle = (sectionId, btnId, afterToggle) => {
+            const btn = document.getElementById(btnId);
+            if (!btn) return;
+            const section = document.getElementById(sectionId);
+            btn.addEventListener('click', () => {
+                const isFs = section.classList.toggle('section-fullscreen');
+                btn.textContent = isFs ? '✕' : '⛶';
+                btn.title = isFs ? 'Exit fullscreen (Esc)' : 'Fullscreen';
+                setTimeout(afterToggle, 50);
+            });
+        };
+
+        toggle('timelineSection', 'timelineFullscreenBtn', () => {
+            this.initCanvases();
+            this.draw();
+        });
+        toggle('graphSection', 'graphFullscreenBtn', () => {
+            this.drawGraphD3();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.section-fullscreen').forEach(el => {
+                    el.classList.remove('section-fullscreen');
+                    const btn = el.querySelector('.fullscreen-btn');
+                    if (btn) { btn.textContent = '⛶'; btn.title = 'Fullscreen'; }
+                });
+                setTimeout(() => { this.initCanvases(); this.draw(); }, 50);
+            }
+        });
+    }
+
     draw() {
         this.drawTimeline();
-        this.drawGraph();
+        this.drawGraphD3();
     }
     
     drawTimeline() {
@@ -858,9 +996,16 @@ class IntervalGraphVisualizer {
             const y = lineY + 40 + (level * spacing);
             const xStart = lineStart + (lineLength * interval.start / 100);
             const xEnd = lineStart + (lineLength * interval.end / 100);
+
+            const isActive = this.activeInterval && this.activeInterval.id === interval.id;
+            const hovInt = this.hoveredInteraction && this.hoveredInteraction.interval.id === interval.id;
             
+            ctx.save();
+
+            // Slightly dim active interval while dragging
+            ctx.globalAlpha = isActive ? 0.75 : 1;
+
             // Draw interval line
-            ctx.fillStyle = interval.color;
             ctx.strokeStyle = interval.color;
             ctx.lineWidth = intervalHeight;
             ctx.lineCap = 'round';
@@ -870,6 +1015,8 @@ class IntervalGraphVisualizer {
             ctx.lineTo(xEnd, y);
             ctx.stroke();
             
+            ctx.globalAlpha = 1;
+
             // Draw interval name
             ctx.fillStyle = '#fff';
             ctx.font = 'bold 14px Arial';
@@ -881,6 +1028,38 @@ class IntervalGraphVisualizer {
             ctx.fillStyle = '#333';
             ctx.fillText(interval.start.toFixed(1), xStart, y - 15);
             ctx.fillText(interval.end.toFixed(1), xEnd, y - 15);
+
+            // Draw edge handles when hovering or dragging/resizing this interval
+            if (hovInt || isActive) {
+                const leftHot = (hovInt && this.hoveredInteraction.type === 'left') ||
+                                (isActive && this.interactionMode === 'resize-left');
+                const rightHot = (hovInt && this.hoveredInteraction.type === 'right') ||
+                                 (isActive && this.interactionMode === 'resize-right');
+
+                const drawHandle = (hx, hot) => {
+                    ctx.beginPath();
+                    ctx.arc(hx, y, 7, 0, Math.PI * 2);
+                    ctx.fillStyle = hot ? '#fff' : 'rgba(255,255,255,0.85)';
+                    ctx.strokeStyle = hot ? '#333' : '#777';
+                    ctx.lineWidth = hot ? 2 : 1.5;
+                    ctx.fill();
+                    ctx.stroke();
+                    // Vertical grip lines
+                    ctx.strokeStyle = hot ? '#555' : '#999';
+                    ctx.lineWidth = 1.5;
+                    [-2.5, 0, 2.5].forEach(offset => {
+                        ctx.beginPath();
+                        ctx.moveTo(hx + offset, y - 3.5);
+                        ctx.lineTo(hx + offset, y + 3.5);
+                        ctx.stroke();
+                    });
+                };
+
+                drawHandle(xStart, leftHot);
+                drawHandle(xEnd, rightHot);
+            }
+
+            ctx.restore();
         });
         
         // Update canvas height if needed
@@ -892,13 +1071,8 @@ class IntervalGraphVisualizer {
         }
         
         // Update axis info
-        document.getElementById('timelineAxis').textContent = 
-            'Drag to create • Left-click to edit • Right-click to delete';
-    }
-    
-    draw() {
-        this.drawTimeline();
-        this.drawGraphD3();
+        document.getElementById('timelineAxis').textContent =
+            'Drag axis to create • Drag edges ◀▶ to resize • Drag body to move • Click to edit • Right-click to delete';
     }
     
     resetGraphLayout() {
