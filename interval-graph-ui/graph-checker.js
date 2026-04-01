@@ -39,10 +39,10 @@ function isPEO(n, adj, order) {
 
     for (let i = 0; i < n; i++) {
         const v = order[i];
-        const later = [...adj[v]].filter(u => pos[u] > i);
-        for (let a = 0; a < later.length; a++) {
-            for (let b = a + 1; b < later.length; b++) {
-                if (!adj[later[a]].has(later[b])) return false;
+        const earlier = [...adj[v]].filter(u => pos[u] < i);
+        for (let a = 0; a < earlier.length; a++) {
+            for (let b = a + 1; b < earlier.length; b++) {
+                if (!adj[earlier[a]].has(earlier[b])) return false;
             }
         }
     }
@@ -720,9 +720,7 @@ class GraphCheckerApp {
     // ── Example graphs ─────────────────────────────────────────
 
     loadExampleInterval() {
-        // Bull graph chordal version: triangle A-B-C with edges A-D and B-D and B-E and C-E
-        // = path P5 with all possible chords → interval graph
-        // Use a simpler clear example: A-B-C-D path + chords A-C, B-D
+        // Path A-B-C-D with extra chords A-C and B-D, making it a chordal interval graph
         this.reset();
         const cx = this.svgWidth / 2, cy = this.svgHeight / 2;
         const xs = [cx - 180, cx - 60, cx + 60, cx + 180];
@@ -742,7 +740,7 @@ class GraphCheckerApp {
     }
 
     loadExampleNonInterval() {
-        // Net graph: triangle A-B-C with pendant nodes D(→A), E(→B), F(→C)
+        // Net graph: triangle A-B-C with pendant nodes D-A, E-B, F-C
         // Chordal but NOT an interval graph (clique intersection graph is a star K₁,₃)
         this.reset();
         const cx = this.svgWidth / 2, cy = this.svgHeight / 2;
