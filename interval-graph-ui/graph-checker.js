@@ -406,9 +406,7 @@ class GraphCheckerApp {
     }
 
     deleteNode(id) {
-        console.log('deleteNode called with id:', id);
         this.nodes = this.nodes.filter(n => n.id !== id);
-        console.log('Nodes after delete:', this.nodes.length);
         this.edges = this.edges.filter(e => e.source !== id && e.target !== id);
         if (this.edgeStartId === id) this.edgeStartId = null;
         this.render();
@@ -454,7 +452,6 @@ class GraphCheckerApp {
     // ── Rendering ─────────────────────────────────────────────
 
     render() {
-        console.log('=== RENDER CALLED === renderCount:', ++this.renderCount);
         const svg = this.svg;
         svg.selectAll('*').remove();
 
@@ -500,10 +497,17 @@ class GraphCheckerApp {
                 }
             })
             .on('mouseenter', (event, d) => {
-                if (this.tool !== 'delete') return;
-                this.hoverEdgeId = d.id; this.render();
+                // Update stroke directly on hover - don't call render()
+                if (this.tool === 'delete') {
+                    d3.select(event.currentTarget).attr('stroke', '#e53935').attr('stroke-width', 5);
+                }
             })
-            .on('mouseleave', () => { this.hoverEdgeId = null; this.render(); });
+            .on('mouseleave', (event, d) => {
+                // Reset stroke directly - don't call render()
+                if (this.tool === 'delete') {
+                    d3.select(event.currentTarget).attr('stroke', '#999').attr('stroke-width', 2.5);
+                }
+            });
 
         // Nodes
         const dragBehavior = d3.drag()
@@ -538,7 +542,7 @@ class GraphCheckerApp {
         }
         
         // Circle
-        nodeEl.append('circle')
+        const circles = nodeEl.append('circle')
             .attr('r', 22)
             .attr('fill', d => d.color)
             .attr('stroke', d => {
@@ -550,29 +554,34 @@ class GraphCheckerApp {
                 d.id === this.edgeStartId || (this.tool === 'delete' && d.id === this.hoverNodeId) ? 4 : 2.5
             )
             .on('mousedown', (event, d) => {
-                console.log('CIRCLE MOUSEDOWN - tool:', this.tool, 'id:', d.id);
                 if (this.tool === 'delete') {
-                    // Store the node ID to delete on mouseup
                     this.nodeToDelete = d.id;
-                    console.log('Set nodeToDelete to:', this.nodeToDelete);
                 } else if (this.tool === 'addEdge') {
-                    // For edge mode, let normal click handling work
                     this.nodeToClick = d;
                 }
             })
             .on('mouseup', (event, d) => {
-                console.log('CIRCLE MOUSEUP - tool:', this.tool, 'id:', d.id, 'nodeToDelete:', this.nodeToDelete);
                 if (this.tool === 'delete' && this.nodeToDelete === d.id) {
-                    // Only delete if mouseup is on the same node as mousedown
-                    console.log('DELETING NODE:', d.id);
                     event.stopPropagation();
                     this.deleteNode(d.id);
                     this.nodeToDelete = null;
                 } else if (this.tool === 'addEdge' && this.nodeToClick && this.nodeToClick.id === d.id) {
                     this.handleNodeClick(d);
                     this.nodeToClick = null;
-                } else {
-                    console.log('NOT DELETING - mismatch or wrong tool');
+                }
+            })
+            .on('mouseenter', (event, d) => {
+                // Update stroke directly on hover - don't call render()
+                if (this.tool === 'delete') {
+                    d3.select(event.currentTarget).attr('stroke', '#e53935').attr('stroke-width', 4);
+                }
+            })
+            .on('mouseleave', (event, d) => {
+                // Reset stroke directly - don't call render()
+                if (this.tool === 'delete') {
+                    const stroke = d.id === this.edgeStartId ? '#667eea' : '#fff';
+                    const strokeWidth = d.id === this.edgeStartId ? 4 : 2.5;
+                    d3.select(event.currentTarget).attr('stroke', stroke).attr('stroke-width', strokeWidth);
                 }
             });
         
@@ -585,17 +594,6 @@ class GraphCheckerApp {
             .attr('font-weight', 'bold')
             .attr('pointer-events', 'none')
             .text(d => d.name);
-
-        // Hover for delete-mode highlight
-        nodeEl.on('mouseenter', (event, d) => {
-            console.log('NODE MOUSEENTER - id:', d.id, 'tool:', this.tool);
-            if (this.tool !== 'delete') return;
-            this.hoverNodeId = d.id; this.render();
-        })
-        .on('mouseleave', () => { 
-            console.log('NODE MOUSELEAVE');
-            this.hoverNodeId = null; this.render(); 
-        });
 
         // Placeholder text when empty
         if (this.nodes.length === 0) {
