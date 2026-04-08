@@ -242,6 +242,7 @@ class GraphCheckerApp {
             '#E63946', '#A8DADC', '#457B9D', '#F77F00', '#06A77D',
         ];
         this.colorIdx = 0;
+        this.lastValidIntervals = null; // Store intervals for export
 
         this.svgEl = document.getElementById('graphEditorSvg');
         this.resultCanvas = document.getElementById('resultCanvas');
@@ -251,6 +252,7 @@ class GraphCheckerApp {
         this.setupToolButtons();
         this.setupExampleButtons();
         this.setupClearButton();
+        this.setupExportButton();
         this.setupFullscreen();
         this.render();
         this.updateResult();
@@ -340,6 +342,10 @@ class GraphCheckerApp {
             this.render();
             this.updateResult();
         });
+    }
+
+    setupExportButton() {
+        document.getElementById('exportIntervalsBtn').addEventListener('click', () => this.exportIntervals());
     }
 
     setupFullscreen() {
@@ -628,6 +634,7 @@ class GraphCheckerApp {
         const intervalSection = document.getElementById('intervalResultSection');
 
         if (n === 0) {
+            this.lastValidIntervals = null; // Clear stored intervals
             resultContent.innerHTML = '<div class="result-empty">Add nodes and edges to analyze the graph.</div>';
             intervalSection.style.display = 'none';
             return;
@@ -637,6 +644,7 @@ class GraphCheckerApp {
         const result = checkIntervalGraph(n, adj);
 
         if (result.isInterval) {
+            this.lastValidIntervals = result.intervals; // Store for export
             resultContent.innerHTML = `
                 <div class="result-yes">
                     <div class="result-verdict">
@@ -652,6 +660,7 @@ class GraphCheckerApp {
             intervalSection.style.display = 'block';
             this.drawIntervalResult(result.intervals);
         } else {
+            this.lastValidIntervals = null; // Clear stored intervals
             const reason = result.reason === 'not_chordal'
                 ? 'The graph contains an induced cycle of length ≥ 4 and is therefore <strong>not chordal</strong>. Every interval graph must be chordal.'
                 : 'The graph is chordal, but its maximal cliques cannot be arranged in a linear order satisfying the Consecutive Ones Property. This means the graph contains an <strong>asteroidal triple</strong> and is not an interval graph.';
@@ -763,6 +772,46 @@ class GraphCheckerApp {
         if (result.isInterval) this.drawIntervalResult(result.intervals);
     }
 
+    exportIntervals() {
+        if (!this.lastValidIntervals) {
+            console.warn('No valid intervals to export');
+            return;
+        }
+        
+        const intervals = [];
+        let id = 1;
+        
+        // Transform graph-checker format to index.html format
+        for (let i = 0; i < this.nodes.length; i++) {
+            const interval = this.lastValidIntervals[i];
+            if (interval) {
+                intervals.push({
+                    id: id++,
+                    name: this.nodes[i].name,
+                    start: interval.start,
+                    end: interval.end,
+                    color: this.nodes[i].color
+                });
+            }
+        }
+        
+        const data = {
+            intervals: intervals,
+            nextId: id,
+            colorIndex: intervals.length,
+            version: '1.0'
+        };
+        
+        // Create and download JSON file
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `intervals_from_graph_${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
     // ── Example graphs ─────────────────────────────────────────
 
     loadExampleInterval() {
@@ -819,4 +868,4 @@ class GraphCheckerApp {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => { new GraphCheckerApp(); });
+document.addEventListener('DOMContentLoaded', () => { window.app = new GraphCheckerApp(); });

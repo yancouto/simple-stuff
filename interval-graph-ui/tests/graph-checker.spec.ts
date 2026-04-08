@@ -126,4 +126,203 @@ test.describe('Graph Checker - Bug Fixes', () => {
     edges = page.locator('#graphEditorSvg g.edges line');
     await expect(edges).toHaveCount(0);
   });
+
+  test('export button appears for interval graph', async ({ page }) => {
+    const svg = page.locator('#graphEditorSvg');
+    
+    // Create a path graph A-B-C (always an interval graph)
+    await svg.click({ position: { x: 100, y: 200 } }); // Node A
+    await svg.click({ position: { x: 250, y: 200 } }); // Node B
+    await svg.click({ position: { x: 400, y: 200 } }); // Node C
+    
+    // Switch to edge mode
+    await page.click('button[data-tool="addEdge"]');
+    
+    // Add edges A-B and B-C
+    const circles = page.locator('#graphEditorSvg g.nodes g circle');
+    await circles.nth(0).click(); // A
+    await circles.nth(1).click(); // B
+    await circles.nth(1).click(); // B
+    await circles.nth(2).click(); // C
+    
+    // Wait for validation
+    await page.waitForTimeout(500);
+    
+    // Export button should be visible
+    const exportBtn = page.locator('#exportIntervalsBtn');
+    await expect(exportBtn).toBeVisible();
+  });
+
+  test('export button does not appear for non-interval graph', async ({ page }) => {
+    const svg = page.locator('#graphEditorSvg');
+    
+    // Create a cycle of 4 nodes (not an interval graph - not chordal)
+    await svg.click({ position: { x: 200, y: 150 } }); // Node A
+    await svg.click({ position: { x: 350, y: 150 } }); // Node B
+    await svg.click({ position: { x: 350, y: 300 } }); // Node C
+    await svg.click({ position: { x: 200, y: 300 } }); // Node D
+    
+    // Switch to edge mode
+    await page.click('button[data-tool="addEdge"]');
+    
+    // Add edges forming a 4-cycle: A-B, B-C, C-D, D-A
+    const circles = page.locator('#graphEditorSvg g.nodes g circle');
+    await circles.nth(0).click(); // A
+    await circles.nth(1).click(); // B
+    await circles.nth(1).click(); // B
+    await circles.nth(2).click(); // C
+    await circles.nth(2).click(); // C
+    await circles.nth(3).click(); // D
+    await circles.nth(3).click(); // D
+    await circles.nth(0).click(); // A
+    
+    // Wait for validation
+    await page.waitForTimeout(500);
+    
+    // Export button should not exist or be hidden
+    const exportBtn = page.locator('#exportIntervalsBtn');
+    await expect(exportBtn).not.toBeVisible();
+  });
+
+  test('exported intervals can be imported into index.html', async ({ page }) => {
+    // Step 1: Create and export from graph-checker
+    const svg = page.locator('#graphEditorSvg');
+    
+    // Create a path graph A-B-C
+    await svg.click({ position: { x: 100, y: 200 } });
+    await svg.click({ position: { x: 250, y: 200 } });
+    await svg.click({ position: { x: 400, y: 200 } });
+    
+    // Add edges
+    await page.click('button[data-tool="addEdge"]');
+    const circles = page.locator('#graphEditorSvg g.nodes g circle');
+    await circles.nth(0).click();
+    await circles.nth(1).click();
+    await circles.nth(1).click();
+    await circles.nth(2).click();
+    
+    await page.waitForTimeout(500);
+    
+    // Set up download listener
+    const downloadPromise = page.waitForEvent('download');
+    await page.click('#exportIntervalsBtn');
+    const download = await downloadPromise;
+    
+    // Save the file
+    const filePath = path.resolve(__dirname, '..', 'test-results', 'exported-intervals.json');
+    await download.saveAs(filePath);
+    
+    // Read and verify the exported JSON
+    const fs = require('fs');
+    const exportedData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    
+    expect(exportedData.version).toBe('1.0');
+    expect(exportedData.intervals).toHaveLength(3);
+    expect(exportedData.intervals[0].name).toBe('A');
+    expect(exportedData.intervals[1].name).toBe('B');
+    expect(exportedData.intervals[2].name).toBe('C');
+    expect(exportedData.nextId).toBe(4);
+    expect(exportedData.colorIndex).toBe(3);
+    
+    // Verify each interval has required fields
+    for (const interval of exportedData.intervals) {
+      expect(interval).toHaveProperty('id');
+      expect(interval).toHaveProperty('name');
+      expect(interval).toHaveProperty('start');
+      expect(interval).toHaveProperty('end');
+      expect(interval).toHaveProperty('color');
+      expect(interval.start).toBeGreaterThanOrEqual(0);
+      expect(interval.end).toBeGreaterThanOrEqual(interval.start);
+      expect(interval.end).toBeLessThanOrEqual(100);
+    }
+  });
+
+  test('lastValidIntervals property stores intervals for valid graphs', async ({ page }) => {
+    const svg = page.locator('#graphEditorSvg');
+    
+    // Create a simple triangle (interval graph)
+    await svg.click({ position: { x: 200, y: 150 } }); // Node A
+    await svg.click({ position: { x: 350, y: 150 } }); // Node B
+    await svg.click({ position: { x: 275, y: 280 } }); // Node C
+    
+    // Switch to edge mode
+    await page.click('button[data-tool="addEdge"]');
+    
+    // Connect all three nodes to form a triangle
+    const circles = page.locator('#graphEditorSvg g.nodes g circle');
+    await circles.nth(0).click(); // A
+    await circles.nth(1).click(); // B
+    await circles.nth(1).click(); // B
+    await circles.nth(2).click(); // C
+    await circles.nth(2).click(); // C
+    await circles.nth(0).click(); // A
+    
+    // Wait for validation
+    await page.waitForTimeout(500);
+    
+    // Check that lastValidIntervals is stored
+    const intervals = await page.evaluate(() => {
+      return (window as any).app.lastValidIntervals;
+    });
+    
+    expect(intervals).not.toBeNull();
+    expect(Array.isArray(intervals)).toBe(true);
+    expect(intervals.length).toBe(3); // Should have 3 intervals for 3 nodes
+    
+    // Each interval should have start and end properties
+    intervals.forEach((interval: any) => {
+      expect(interval).toHaveProperty('start');
+      expect(interval).toHaveProperty('end');
+      expect(typeof interval.start).toBe('number');
+      expect(typeof interval.end).toBe('number');
+    });
+  });
+
+  test('lastValidIntervals property is null for non-interval graphs', async ({ page }) => {
+    const svg = page.locator('#graphEditorSvg');
+    
+    // Create a cycle of 4 nodes (not an interval graph)
+    await svg.click({ position: { x: 200, y: 150 } }); // Node A
+    await svg.click({ position: { x: 350, y: 150 } }); // Node B
+    await svg.click({ position: { x: 350, y: 300 } }); // Node C
+    await svg.click({ position: { x: 200, y: 300 } }); // Node D
+    
+    // Switch to edge mode
+    await page.click('button[data-tool="addEdge"]');
+    
+    // Add edges forming a 4-cycle: A-B, B-C, C-D, D-A (not chordal)
+    const circles = page.locator('#graphEditorSvg g.nodes g circle');
+    await circles.nth(0).click(); // A
+    await circles.nth(1).click(); // B
+    await circles.nth(1).click(); // B
+    await circles.nth(2).click(); // C
+    await circles.nth(2).click(); // C
+    await circles.nth(3).click(); // D
+    await circles.nth(3).click(); // D
+    await circles.nth(0).click(); // A
+    
+    // Wait for validation
+    await page.waitForTimeout(500);
+    
+    // Check that lastValidIntervals is null
+    const intervals = await page.evaluate(() => {
+      return (window as any).app.lastValidIntervals;
+    });
+    
+    expect(intervals).toBeNull();
+  });
+
+  test('lastValidIntervals property is null for empty graph', async ({ page }) => {
+    // Don't create any nodes - start with empty graph
+    
+    // Wait a bit for initial validation
+    await page.waitForTimeout(500);
+    
+    // Check that lastValidIntervals is null for empty graph
+    const intervals = await page.evaluate(() => {
+      return (window as any).app.lastValidIntervals;
+    });
+    
+    expect(intervals).toBeNull();
+  });
 });
