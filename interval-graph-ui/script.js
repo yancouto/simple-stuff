@@ -33,6 +33,7 @@ class IntervalGraphVisualizer {
         // Hover state
         this.hoveredInterval = null;
         this.tooltip = document.getElementById('tooltip');
+        this.positionIndicator = document.getElementById('positionIndicator');
         
         // D3 graph state
         this.simulation = null;
@@ -475,6 +476,24 @@ class IntervalGraphVisualizer {
     intervalsIntersect(a, b) {
         return a.start < b.end && b.start < a.end;
     }
+
+    calculateDegrees() {
+        const degrees = {};
+        this.intervals.forEach(interval => {
+            degrees[interval.id] = 0;
+        });
+
+        for (let i = 0; i < this.intervals.length; i++) {
+            for (let j = i + 1; j < this.intervals.length; j++) {
+                if (this.intervalsIntersect(this.intervals[i], this.intervals[j])) {
+                    degrees[this.intervals[i].id]++;
+                    degrees[this.intervals[j].id]++;
+                }
+            }
+        }
+
+        return degrees;
+    }
     
     getMousePosition(e) {
         const rect = this.timelineCanvas.getBoundingClientRect();
@@ -623,6 +642,7 @@ class IntervalGraphVisualizer {
         // No active interaction — update cursor and tooltip based on hover
         const interaction = this.getIntervalInteraction(pos.x, pos.y);
         if (interaction) {
+            this.hidePositionIndicator();
             if (interaction.type === 'left' || interaction.type === 'right') {
                 this.timelineCanvas.style.cursor = 'ew-resize';
                 this.showTooltip(e.clientX, e.clientY, interaction.interval, 'Drag to resize');
@@ -633,7 +653,7 @@ class IntervalGraphVisualizer {
             const prev = this.hoveredInteraction;
             if (!prev || prev.interval.id !== interaction.interval.id || prev.type !== interaction.type) {
                 this.hoveredInteraction = interaction;
-                this.draw();
+                this.drawTimeline();
             }
         } else {
             const hadHover = this.hoveredInteraction !== null;
@@ -644,17 +664,29 @@ class IntervalGraphVisualizer {
             if (pos.x >= padding && pos.x <= this.timelineCanvas.width - padding &&
                 pos.y >= lineY - 20 && pos.y <= lineY + 20) {
                 this.timelineCanvas.style.cursor = 'crosshair';
+                // Show position indicator on the timeline axis
+                const currentValue = this.xToValue(pos.x);
+                this.showPositionIndicator(e.clientX, e.clientY, currentValue);
             } else {
                 this.timelineCanvas.style.cursor = 'default';
+                this.hidePositionIndicator();
             }
-            if (hadHover) this.draw();
+            if (hadHover) this.drawTimeline();
         }
     }
     
     showTooltip(x, y, interval, hint = null) {
         const base = `${interval.name}: [${interval.start.toFixed(1)}, ${interval.end.toFixed(1)}]`;
         const hintText = hint ? ` • ${hint}` : ' • Drag to move • Click to edit • Right-click to delete';
-        this.tooltip.textContent = base + hintText;
+        
+        // Add current value at hover position
+        const rect = this.timelineCanvas.getBoundingClientRect();
+        const scaleX = this.timelineCanvas.width / rect.width;
+        const hoverX = (x - rect.left) * scaleX;
+        const currentValue = this.xToValue(hoverX);
+        const valueText = ` (@ ${currentValue.toFixed(1)})`;
+        
+        this.tooltip.textContent = base + valueText + hintText;
         this.tooltip.style.left = (x + 10) + 'px';
         this.tooltip.style.top = (y - 30) + 'px';
         this.tooltip.classList.add('visible');
@@ -662,6 +694,20 @@ class IntervalGraphVisualizer {
     
     hideTooltip() {
         this.tooltip.classList.remove('visible');
+    }
+    
+    showPositionIndicator(x, y, value) {
+        if (!this.positionIndicator) return;
+        const containerRect = this.timelineCanvas.parentElement.getBoundingClientRect();
+        this.positionIndicator.textContent = value.toFixed(1);
+        this.positionIndicator.style.left = (x - containerRect.left) + 'px';
+        this.positionIndicator.style.top = (y - containerRect.top - 28) + 'px';
+        this.positionIndicator.classList.add('visible');
+    }
+    
+    hidePositionIndicator() {
+        if (!this.positionIndicator) return;
+        this.positionIndicator.classList.remove('visible');
     }
     
     onMouseUp(e) {
@@ -744,6 +790,7 @@ class IntervalGraphVisualizer {
         }
         this.hoveredInteraction = null;
         this.hideTooltip();
+        this.hidePositionIndicator();
     }
     
     // Touch events for mobile
@@ -999,6 +1046,7 @@ class IntervalGraphVisualizer {
         // Draw intervals using calculated levels
         const intervalHeight = 25;
         const spacing = 35;
+        const degrees = this.calculateDegrees();
         
         this.intervals.forEach((interval) => {
             const level = this.intervalLevels.get(interval.id) || 0;
@@ -1030,7 +1078,17 @@ class IntervalGraphVisualizer {
             ctx.fillStyle = '#fff';
             ctx.font = 'bold 14px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText(interval.name, (xStart + xEnd) / 2, y + 5);
+            const centerX = (xStart + xEnd) / 2;
+            ctx.fillText(interval.name, centerX, y + 5);
+            
+            // Calculate and show degree to the right of name if there's space
+            const intervalWidth = xEnd - xStart;
+            if (intervalWidth > 80) {
+                ctx.font = '10px Arial';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.textAlign = 'left';
+                ctx.fillText(`(d:${degrees[interval.id] || 0})`, centerX + 20, y + 5);
+            }
             
             // Draw start/end values
             ctx.font = '10px Arial';
@@ -1141,6 +1199,13 @@ class IntervalGraphVisualizer {
             }
         }
         
+        const degrees = this.calculateDegrees();
+
+        // Add degree to node data
+        nodes.forEach(node => {
+            node.degree = degrees[node.id] || 0;
+        });
+        
         document.getElementById('edgeCount').textContent = `Edges: ${links.length}`;
         
         // Create force simulation
@@ -1213,21 +1278,31 @@ class IntervalGraphVisualizer {
             .attr('pointer-events', 'none')
             .text(d => d.name);
         
-        // Add interval range labels below nodes
+        // Add interval range labels below nodes (hidden by default)
         node.append('text')
             .attr('text-anchor', 'middle')
             .attr('y', 40)
             .attr('fill', '#333')
             .attr('font-size', '11px')
             .attr('pointer-events', 'none')
+            .attr('class', 'range-label')
+            .style('opacity', 0)
             .text(d => `[${d.start.toFixed(1)}, ${d.end.toFixed(1)}]`);
         
         // Add title for tooltips
         node.append('title')
             .text(d => {
                 const fixedStatus = (d.fx !== undefined && d.fx !== null) ? ' (Fixed)' : ' (Free)';
-                return `${d.name}: [${d.start.toFixed(1)}, ${d.end.toFixed(1)}]${fixedStatus}\nDrag to reposition, Click to toggle fix`;
+                return `${d.name}: [${d.start.toFixed(1)}, ${d.end.toFixed(1)}] • Degree: ${d.degree}${fixedStatus}\nDrag to reposition, Click to toggle fix`;
             });
+        
+        // Add hover interactions to show/hide range label
+        node.on('mouseenter', function() {
+            d3.select(this).select('.range-label').style('opacity', 1);
+        })
+        .on('mouseleave', function() {
+            d3.select(this).select('.range-label').style('opacity', 0);
+        });
         
         // Update positions on simulation tick
         this.simulation.on('tick', () => {
@@ -1319,4 +1394,3 @@ class IntervalGraphVisualizer {
 document.addEventListener('DOMContentLoaded', () => {
     new IntervalGraphVisualizer();
 });
-
