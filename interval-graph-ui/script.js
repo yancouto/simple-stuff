@@ -828,7 +828,7 @@ class IntervalGraphVisualizer {
         ctx.globalAlpha = 0.5;
         ctx.strokeStyle = this.previewColor;
         ctx.lineWidth = 25;
-        ctx.lineCap = 'round';
+        ctx.lineCap = 'butt';
         
         ctx.beginPath();
         ctx.moveTo(xStart, lineY);
@@ -1065,7 +1065,7 @@ class IntervalGraphVisualizer {
             // Draw interval line
             ctx.strokeStyle = interval.color;
             ctx.lineWidth = intervalHeight;
-            ctx.lineCap = 'round';
+            ctx.lineCap = 'butt';
             
             ctx.beginPath();
             ctx.moveTo(xStart, y);

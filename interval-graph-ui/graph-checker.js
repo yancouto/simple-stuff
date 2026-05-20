@@ -749,7 +749,7 @@ class GraphCheckerApp {
             ctx.save();
             ctx.strokeStyle = node.color;
             ctx.lineWidth = intervalHeight;
-            ctx.lineCap = 'round';
+            ctx.lineCap = 'butt';
             ctx.beginPath(); ctx.moveTo(xS, y); ctx.lineTo(xE, y); ctx.stroke();
 
             ctx.fillStyle = '#fff';
